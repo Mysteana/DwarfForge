@@ -1,0 +1,8 @@
+
+1. Download recommended Bukkit Jar file and place it in lib folder.
+2. Start a (bash) shell.
+3. ./build.sh
+4. Enjoy! (Edit ./upload.sh to fit your needs, if you like.)
+5. Have a beer.
+6. There is no step number six!
+

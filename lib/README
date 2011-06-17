@@ -1,0 +1,4 @@
+
+Download a recommended Bukkit Jar (and any other Jars you need) into this folder.
+The build script (./build.sh) will automatically include all of them in the classpath.
+
