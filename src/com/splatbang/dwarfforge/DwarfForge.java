@@ -31,5 +31,9 @@ public class DwarfForge extends JavaPlugin {
         log.info("[DwarfForge] " + msg);
     }
 
+    public void logSevere(String msg) {
+        log.severe("[DwarfForge] " + msg);
+    }
+
 }
 

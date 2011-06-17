@@ -7,6 +7,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.material.MaterialData;
 
 public class DFBlockListener extends BlockListener {
 
@@ -22,19 +23,20 @@ public class DFBlockListener extends BlockListener {
 
     public void onBlockDamage(BlockDamageEvent event) {
         Block block = event.getBlock();
-        BlockState blockState = block.getState();
 
-        if (blockState instanceof Furnace) {
-            if (isLavaBelow(block)) {
-                Furnace f = (Furnace) blockState;
-                f.setBurnTime(DURATION);
-            }
+        if (isDwarfForge(block)) {
+            ((Furnace) block.getState()).setBurnTime(DURATION);
         }
+        
     }
 
-    private static boolean isLavaBelow(Block block) {
+    private boolean isDwarfForge(Block block) {
+        if (! (block.getState() instanceof Furnace))
+            return false;
+
         Block below = block.getRelative(BlockFace.DOWN);
-        return (below.getType() == Material.LAVA) || (below.getType() == Material.STATIONARY_LAVA);
+        return (below.getType() == Material.LAVA)
+            || (below.getType() == Material.STATIONARY_LAVA);
     }
 
 }
