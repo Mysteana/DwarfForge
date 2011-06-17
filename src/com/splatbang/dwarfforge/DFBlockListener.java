@@ -7,6 +7,8 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
 
 public class DFBlockListener extends BlockListener {
@@ -24,10 +26,39 @@ public class DFBlockListener extends BlockListener {
     public void onBlockDamage(BlockDamageEvent event) {
         Block block = event.getBlock();
 
-        if (isDwarfForge(block)) {
-            ((Furnace) block.getState()).setBurnTime(DURATION);
+        if (!isDwarfForge(block))
+            return;
+
+        final boolean wasOff = (block.getType() == Material.FURNACE);
+
+        if (wasOff) {
+            Furnace before = (Furnace) block.getState();
+
+            // Save existing furnace inventory.
+            Inventory inv = before.getInventory();
+            ItemStack[] stuff = inv.getContents();
+            inv.clear();
+
+            // Change to a burning furnace.
+            block.setType(Material.BURNING_FURNACE);
+
+            Furnace after = (Furnace) block.getState();
+
+            // Restore previous inventory and state.
+            after.getInventory().setContents(stuff);
+            after.setData(before.getData());
+
+            // Set our burn time and update block's state.
+            after.setBurnTime(DURATION);
+            after.update();
         }
-        
+        else {
+            Furnace state = (Furnace) block.getState();
+
+            // Furnace was already on, just extend burn time and update.
+            state.setBurnTime(DURATION);
+            state.update();
+        }
     }
 
     private boolean isDwarfForge(Block block) {
