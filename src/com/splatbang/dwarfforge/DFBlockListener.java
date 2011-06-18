@@ -36,6 +36,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
     }
 
     public void onBlockDamage(BlockDamageEvent event) {
+        if (event.isCancelled())
+            return;
+
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
@@ -47,6 +50,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
     }
 
     public void onBlockBreak(BlockBreakEvent event) {
+        if (event.isCancelled())
+            return;
+
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
