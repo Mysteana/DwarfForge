@@ -2,11 +2,12 @@ package com.splatbang.dwarfforge;
 
 import java.lang.String;
 import java.util.logging.Logger;
-import org.bukkit.Server;
+
 import org.bukkit.event.Event;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+
 
 public class DwarfForge extends JavaPlugin {
     public static Logger log = Logger.getLogger("Minecraft");
@@ -18,12 +19,16 @@ public class DwarfForge extends JavaPlugin {
         PluginManager pm = getServer().getPluginManager();
         pm.registerEvent(Event.Type.BLOCK_DAMAGE, blockListener, Event.Priority.Monitor, this);
 
+        blockListener.startTask();
+
         PluginDescriptionFile pdf = this.getDescription();
         logInfo("Version " + pdf.getVersion() + " enabled.");
     }
 
     @Override
     public void onDisable() {
+        blockListener.stopTask();
+
         logInfo("Disabled.");
     }
 
