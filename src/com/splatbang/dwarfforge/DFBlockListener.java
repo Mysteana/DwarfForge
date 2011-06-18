@@ -29,36 +29,29 @@ public class DFBlockListener extends BlockListener {
         if (!isDwarfForge(block))
             return;
 
+        Furnace before = (Furnace) block.getState();
+
+        // Save existing furnace inventory.
+        Inventory inv = before.getInventory();
+        ItemStack[] stuff = inv.getContents();
+        inv.clear();
+
         final boolean wasOff = (block.getType() == Material.FURNACE);
+        
+        // Turn furnace on/off.
+        block.setType(wasOff ? Material.BURNING_FURNACE : Material.FURNACE);
 
-        if (wasOff) {
-            Furnace before = (Furnace) block.getState();
+        Furnace after = (Furnace) block.getState();
 
-            // Save existing furnace inventory.
-            Inventory inv = before.getInventory();
-            ItemStack[] stuff = inv.getContents();
-            inv.clear();
+        // Restore previous inventory and state.
+        after.getInventory().setContents(stuff);
+        after.setData(before.getData());
 
-            // Change to a burning furnace.
-            block.setType(Material.BURNING_FURNACE);
+        // Set (or reset) the burn time.
+        after.setBurnTime(wasOff ? DURATION : 0);
 
-            Furnace after = (Furnace) block.getState();
-
-            // Restore previous inventory and state.
-            after.getInventory().setContents(stuff);
-            after.setData(before.getData());
-
-            // Set our burn time and update block's state.
-            after.setBurnTime(DURATION);
-            after.update();
-        }
-        else {
-            Furnace state = (Furnace) block.getState();
-
-            // Furnace was already on, just extend burn time and update.
-            state.setBurnTime(DURATION);
-            state.update();
-        }
+        // Update block's state.
+        after.update();
     }
 
     private boolean isDwarfForge(Block block) {
