@@ -60,13 +60,17 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
+    // A Dwarf Forge is:
+    // 1. A furnace directly above lava.
+    // 2. A furnace directly above a Dwarf Forge.
     private boolean isDwarfForge(Block block) {
         if (! (block.getState() instanceof Furnace))
             return false;
 
         Block below = block.getRelative(BlockFace.DOWN);
         return (below.getType() == Material.LAVA)
-            || (below.getType() == Material.STATIONARY_LAVA);
+            || (below.getType() == Material.STATIONARY_LAVA)
+            || (isDwarfForge(below));
     }
 
     private boolean isBurning(Block forge) {
