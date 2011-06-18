@@ -9,6 +9,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.block.BlockListener;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -22,8 +23,8 @@ public class DFBlockListener extends BlockListener implements Runnable {
     private static final short MINS = 60 * SECS;
 
     private static final short ZERO_DURATION = 0;
-    private static final short TASK_DURATION = 20 * SECS;   // should be less than burn duration
-    private static final short BURN_DURATION = 15 * SECS;   // must be less than max short
+    private static final short TASK_DURATION = 20 * MINS;   // should be less than burn duration
+    private static final short BURN_DURATION = 25 * MINS;   // must be less than max short
 
     private DwarfForge plugin;
     private ArrayList<Block> forges = new ArrayList<Block>();
@@ -42,6 +43,14 @@ public class DFBlockListener extends BlockListener implements Runnable {
                 douse(block);
             else
                 ignite(block);
+        }
+    }
+
+    public void onBlockBreak(BlockBreakEvent event) {
+        Block block = event.getBlock();
+
+        if (isDwarfForge(block)) {
+            douse(block);
         }
     }
 
@@ -77,7 +86,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
             ItemStack[] stuff = saveInventory(priorState);
 
             forge.setType(Material.BURNING_FURNACE);
-            // forges.add(forge);
+
+            if (!forges.contains(forge))
+                forges.add(forge);
 
             state = (Furnace) forge.getState();
             restoreInventory(state, stuff);
@@ -96,7 +107,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
             ItemStack[] stuff = saveInventory(priorState);
 
             forge.setType(Material.FURNACE);
-            // forges.remove(forge);
+
+            if (forges.contains(forge))
+                forges.remove(forge);
 
             state = (Furnace) forge.getState();
             restoreInventory(state, stuff);
@@ -120,9 +133,8 @@ public class DFBlockListener extends BlockListener implements Runnable {
     }
 
     public void run() {
-        plugin.logInfo("Poking forges...");
-
         for (Block forge : forges) {
+            ignite(forge);
         }
     }
 
