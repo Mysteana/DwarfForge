@@ -4,7 +4,7 @@ if [ ! -d obj ]; then
     mkdir obj
 fi
 
-echo "-d obj" > opts
+echo "-d obj -Xlint" > opts
 find lib -name "*.jar" | sed -e 's/^/-cp /' >> opts
 find src -name "*.java" > srcs
 set -x
