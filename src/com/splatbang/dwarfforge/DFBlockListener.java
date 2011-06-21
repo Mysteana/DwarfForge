@@ -164,6 +164,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
 
             furnInv.clear(REFINED_SLOT);
             leftInv.addItem(item);
+
+            // Turn redstone power on.
+            redstoneOn(forge);
         }
     }
 
@@ -205,6 +208,30 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
+    private void redstoneOff(Block forge) {
+        Furnace state = (Furnace) forge.getState();
+        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
+
+        // Check for a lever behind the forge.
+        Block behind = forge.getRelative(forward.getOppositeFace());
+        if (behind.getType() == Material.LEVER) {
+            // Turn the lever to OFF setting.
+            behind.setData((byte) (behind.getData() & ~0x8));    // clear ON bit
+        }
+    }
+
+    private void redstoneOn(Block forge) {
+        Furnace state = (Furnace) forge.getState();
+        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
+
+        // Check for a lever behind the forge.
+        Block behind = forge.getRelative(forward.getOppositeFace());
+        if (behind.getType() == Material.LEVER) {
+            // Turn the lever to ON setting.
+            behind.setData((byte) (behind.getData() | 0x8));    // set ON bit
+        }
+    }
+
     public void startTask() {
         task = plugin.getServer().getScheduler()
             .scheduleSyncRepeatingTask(plugin, this, 0, TASK_DURATION);
@@ -223,6 +250,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
             ignite(forge);
 
             Furnace state = (Furnace) forge.getState();
+
+            // Turn redstone power off.
+            redstoneOff(forge);
 
             // Do we need to move out refined materials?
             ItemStack refined = state.getInventory().getItem(REFINED_SLOT);
