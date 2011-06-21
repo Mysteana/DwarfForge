@@ -3,6 +3,7 @@ package com.splatbang.dwarfforge;
 import java.lang.Runnable;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.bukkit.Material;
@@ -161,12 +162,25 @@ public class DFBlockListener extends BlockListener implements Runnable {
             Inventory leftInv = ((Chest) left).getInventory();
 
             ItemStack item = furnInv.getItem(REFINED_SLOT);
+            int preCount = item.getAmount();
 
+            // Remove the item from the furnace.
             furnInv.clear(REFINED_SLOT);
-            leftInv.addItem(item);
+
+            // Add the smelted item to the chest.
+            HashMap<Integer,ItemStack> remains = leftInv.addItem(item);
+
+            // Did everything fit?
+            if (!remains.isEmpty()) {
+                // NO. Put back what remains into the refined slot.
+                furnInv.setItem(REFINED_SLOT, remains.get(0));
+            }
+
+            int postCount = furnInv.getItem(REFINED_SLOT).getAmount();
 
             // Turn redstone power on.
-            redstoneOn(forge);
+            if (postCount != preCount)
+                redstoneOn(forge);
         }
     }
 
