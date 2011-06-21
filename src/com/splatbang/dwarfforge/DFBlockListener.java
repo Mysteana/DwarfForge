@@ -31,7 +31,7 @@ public class DFBlockListener extends BlockListener implements Runnable {
 
     private static final short ZERO_DURATION = 0;
     private static final short TASK_DURATION = 2 * SECS;   // should be less than burn duration
-    private static final short BURN_DURATION = 9 * SECS;   // must be less than max short
+    private static final short BURN_DURATION =25 * MINS;   // must be less than max short
 
     private static final int RAW_SLOT = 0;
     private static final int FUEL_SLOT = 1;
@@ -288,6 +288,25 @@ public class DFBlockListener extends BlockListener implements Runnable {
 
     public void run() {
         for (Block forge : forges) {
+
+            // TODO: Something is going on where the furnace blocks that have been
+            // added to the task list are no longer furnaces. For now, I'll skip
+            // those (which means they will run out after a while), but I need to
+            // figure out why these furnaces stop becoming furnaces.
+            if (!isDwarfForge(forge)) {
+
+                BlockState test = forge.getState();
+                if (! (test instanceof Furnace)) {
+                    plugin.logSevere("Expected block " + forge + " to have Furnace block state.");
+                    plugin.logSevere("Instead, found block state [" + test.getClass().getName() + "] " + test);
+                }
+                else {
+                    plugin.logSevere("A furnace is no longer a Dwarf Forge? Was the lava removed?");
+                }
+                plugin.logSevere("Skipping ignite on this block.");
+                continue;
+            }
+
             // Keep the forge burning.
             ignite(forge);
 
