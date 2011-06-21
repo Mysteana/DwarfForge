@@ -1,12 +1,15 @@
 package com.splatbang.dwarfforge;
 
 import java.lang.Runnable;
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -14,6 +17,7 @@ import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
+import org.bukkit.material.FurnaceAndDispenser;
 
 
 public class DFBlockListener extends BlockListener implements Runnable {
@@ -23,8 +27,15 @@ public class DFBlockListener extends BlockListener implements Runnable {
     private static final short MINS = 60 * SECS;
 
     private static final short ZERO_DURATION = 0;
-    private static final short TASK_DURATION = 20 * MINS;   // should be less than burn duration
-    private static final short BURN_DURATION = 25 * MINS;   // must be less than max short
+    private static final short TASK_DURATION = 2 * SECS;   // should be less than burn duration
+    private static final short BURN_DURATION = 9 * SECS;   // must be less than max short
+
+    private static final int RAW_SLOT = 0;
+    private static final int FUEL_SLOT = 1;
+    private static final int REFINED_SLOT = 2;
+
+    private static final List<BlockFace> dirs = Arrays.asList(
+        BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST);
 
     private DwarfForge plugin;
     private ArrayList<Block> forges = new ArrayList<Block>();
@@ -130,6 +141,70 @@ public class DFBlockListener extends BlockListener implements Runnable {
         state.update();
     }
 
+    private BlockFace nextFace(BlockFace forward) {
+        return dirs.get((dirs.indexOf(forward) + 1) % dirs.size());
+    }
+
+    private BlockFace prevFace(BlockFace forward) {
+        return dirs.get((dirs.indexOf(forward) + 3) % dirs.size());
+    }
+
+    private void unload(Block forge) {
+        // Blocks are unloaded stage-left of the forge (i.e. face "previous" to forward).
+
+        Furnace state = (Furnace) forge.getState();
+        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
+        BlockState left = forge.getRelative(prevFace(forward)).getState();
+
+        if (left.getType() == Material.CHEST) {
+            Inventory furnInv = state.getInventory();
+            Inventory leftInv = ((Chest) left).getInventory();
+
+            ItemStack item = furnInv.getItem(REFINED_SLOT);
+
+            furnInv.clear(REFINED_SLOT);
+            leftInv.addItem(item);
+        }
+    }
+
+    static final private Material[] smeltables = {
+        Material.DIAMOND_ORE,
+        Material.IRON_ORE,
+        Material.GOLD_ORE,
+        Material.SAND,
+        Material.COBBLESTONE,
+        Material.CLAY,
+        Material.PORK,
+        Material.RAW_FISH,
+        Material.LOG,
+        Material.CACTUS,
+    };
+
+    private void refill(Block forge) {
+        // Blocks are loaded stage-right of the forge (i.e. face "next" from forward).
+
+        Furnace state = (Furnace) forge.getState();
+        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
+        BlockState right = forge.getRelative(nextFace(forward)).getState();
+
+        if (right.getType() == Material.CHEST) {
+            Inventory furnInv = state.getInventory();
+            Inventory rightInv = ((Chest) right).getInventory();
+
+            // Find from chest a smeltable/cookable item.
+            for (int i = 0; i < smeltables.length; ++i) {
+                if (rightInv.contains(smeltables[i])) {
+                    int slot = rightInv.first(smeltables[i]);
+                    ItemStack item = rightInv.getItem(slot);
+
+                    furnInv.setItem(RAW_SLOT, rightInv.getItem(slot));
+                    rightInv.clear(slot);
+                    break;
+                }
+            }
+        }
+    }
+
     public void startTask() {
         task = plugin.getServer().getScheduler()
             .scheduleSyncRepeatingTask(plugin, this, 0, TASK_DURATION);
@@ -144,7 +219,22 @@ public class DFBlockListener extends BlockListener implements Runnable {
 
     public void run() {
         for (Block forge : forges) {
+            // Keep the forge burning.
             ignite(forge);
+
+            Furnace state = (Furnace) forge.getState();
+
+            // Do we need to move out refined materials?
+            ItemStack refined = state.getInventory().getItem(REFINED_SLOT);
+            if (refined != null && refined.getType() != Material.AIR) {
+                unload(forge);
+            }
+
+            // Do we need to find more raw materials?
+            ItemStack raw = state.getInventory().getItem(RAW_SLOT);
+            if (raw == null || raw.getType() == Material.AIR) {
+                refill(forge);
+            }
         }
     }
 
