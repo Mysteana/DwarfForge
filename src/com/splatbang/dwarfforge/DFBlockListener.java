@@ -15,6 +15,8 @@ import org.bukkit.block.Furnace;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
+import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
@@ -69,6 +71,32 @@ public class DFBlockListener extends BlockListener implements Runnable {
 
         if (isDwarfForge(block)) {
             douse(block);
+        }
+    }
+
+    public void onBlockIgnite(BlockIgniteEvent event) {
+        if (event.isCancelled())
+            return;
+
+        if (event.getCause() == IgniteCause.LAVA) {
+            Block block = event.getBlock();
+
+            // If there is any Dwarf Forge within 3 radius, cancel the event.
+            // Yes, it's possible other exposed lava also nearby caused the
+            // event, but let's assume the Dwarfs are protecting the area around
+            // the Dwarf forge sufficiently.
+            for (int dx = -3; dx <= 3; ++dx) {
+                for (int dy = -3; dy <= 3; ++dy) {
+                    for (int dz = -3; dz <= 3; ++dz) {
+                        Block check = block.getRelative(dx, dy, dz);
+                        if (isDwarfForge(check)) {
+                            // Protect the block; cancel the ignite event.
+                            event.setCancelled(true);
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
 

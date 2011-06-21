@@ -17,8 +17,9 @@ public class DwarfForge extends JavaPlugin {
     @Override
     public void onEnable() {
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvent(Event.Type.BLOCK_BREAK,  blockListener, Event.Priority.Monitor, this);
-        pm.registerEvent(Event.Type.BLOCK_DAMAGE, blockListener, Event.Priority.Monitor, this);
+        pm.registerEvent(Event.Type.BLOCK_BREAK,  blockListener, Event.Priority.Normal, this);
+        pm.registerEvent(Event.Type.BLOCK_DAMAGE, blockListener, Event.Priority.Normal, this);
+        pm.registerEvent(Event.Type.BLOCK_IGNITE, blockListener, Event.Priority.Normal, this);
 
         blockListener.startTask();
 
