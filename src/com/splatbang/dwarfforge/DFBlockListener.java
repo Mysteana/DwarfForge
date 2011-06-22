@@ -4,6 +4,7 @@ import java.lang.Runnable;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 import org.bukkit.Material;
@@ -287,23 +288,23 @@ public class DFBlockListener extends BlockListener implements Runnable {
     }
 
     public void run() {
-        for (Block forge : forges) {
+        Iterator<Block> it = forges.iterator();
+        while (it.hasNext()) {
+            Block forge = it.next();
 
-            // TODO: Something is going on where the furnace blocks that have been
-            // added to the task list are no longer furnaces. For now, I'll skip
-            // those (which means they will run out after a while), but I need to
-            // figure out why these furnaces stop becoming furnaces.
+            // It's possible for blocks in this list to change in such a way that
+            // they are no longer forges (but didn't get doused via onBreakBlock
+            // above). A similar thing can occur if the forge is untouched but the
+            // lava has been removed. In any of these cases, we need to remove
+            // the remembered forge and forget it.
             if (!isDwarfForge(forge)) {
+                it.remove();    // Remove from forges list before dousing it.
 
-                BlockState test = forge.getState();
-                if (! (test instanceof Furnace)) {
-                    plugin.logSevere("Expected block " + forge + " to have Furnace block state.");
-                    plugin.logSevere("Instead, found block state [" + test.getClass().getName() + "] " + test);
+                // Not a forge but still a furnace? Douse it.
+                if (forge.getState() instanceof Furnace) {
+                    douse(forge);
                 }
-                else {
-                    plugin.logSevere("A furnace is no longer a Dwarf Forge? Was the lava removed?");
-                }
-                plugin.logSevere("Skipping ignite on this block.");
+
                 continue;
             }
 
