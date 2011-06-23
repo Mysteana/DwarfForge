@@ -179,33 +179,51 @@ public class DFBlockListener extends BlockListener implements Runnable {
         return dirs.get((dirs.indexOf(forward) + 3) % dirs.size());
     }
 
-    private void unload(Block forge) {
-        // Blocks are unloaded stage-left of the forge (i.e. face "previous" to forward).
-
+    private Block getOutputChest(Block forge) {
         Furnace state = (Furnace) forge.getState();
         BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
-        BlockState left = forge.getRelative(prevFace(forward)).getState();
 
-        if (left.getType() == Material.CHEST) {
-            Inventory furnInv = state.getInventory();
-            Inventory leftInv = ((Chest) left).getInventory();
+        // If there is a chest immediately stage-left of this forge, return it.
+        Block left = forge.getRelative(prevFace(forward));
+        if (left.getState().getType() == Material.CHEST)
+            return left;
 
-            ItemStack item = furnInv.getItem(REFINED_SLOT);
+        // If not, but there is a forge below, use its output chest.
+        Block below = forge.getRelative(BlockFace.DOWN);
+        if (isDwarfForge(below))
+            return getOutputChest(below);
+
+        // No output chest.
+        return null;
+    }
+
+    // Blocks are unloaded into chest stage-left of the forge (i.e. face "previous" to forward).
+    private void unload(Block forge) {
+        Furnace state = (Furnace) forge.getState();
+
+        Block output = getOutputChest(forge);
+        if (output != null) {
+            Chest chest = (Chest) output.getState();
+
+            Inventory forgeInv = state.getInventory();
+            Inventory chestInv = chest.getInventory();
+
+            ItemStack item = forgeInv.getItem(REFINED_SLOT);
             int preCount = item.getAmount();
 
             // Remove the item from the furnace.
-            furnInv.clear(REFINED_SLOT);
+            forgeInv.clear(REFINED_SLOT);
 
             // Add the smelted item to the chest.
-            HashMap<Integer,ItemStack> remains = leftInv.addItem(item);
+            HashMap<Integer,ItemStack> remains = chestInv.addItem(item);
 
             // Did everything fit?
             if (!remains.isEmpty()) {
                 // NO. Put back what remains into the refined slot.
-                furnInv.setItem(REFINED_SLOT, remains.get(0));
+                forgeInv.setItem(REFINED_SLOT, remains.get(0));
             }
 
-            int postCount = furnInv.getItem(REFINED_SLOT).getAmount();
+            int postCount = forgeInv.getItem(REFINED_SLOT).getAmount();
 
             // Turn redstone power on.
             if (postCount != preCount)
@@ -226,25 +244,43 @@ public class DFBlockListener extends BlockListener implements Runnable {
         Material.CACTUS,
     };
 
-    private void refill(Block forge) {
-        // Blocks are loaded stage-right of the forge (i.e. face "next" from forward).
-
+    private Block getInputChest(Block forge) {
         Furnace state = (Furnace) forge.getState();
         BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
-        BlockState right = forge.getRelative(nextFace(forward)).getState();
 
-        if (right.getType() == Material.CHEST) {
-            Inventory furnInv = state.getInventory();
-            Inventory rightInv = ((Chest) right).getInventory();
+        // If there is a chest immediately stage-right of this forge, return it.
+        Block right = forge.getRelative(nextFace(forward));
+        if (right.getState().getType() == Material.CHEST)
+            return right;
+
+        // If not, but there is a forge below, use its input chest.
+        Block below = forge.getRelative(BlockFace.DOWN);
+        if (isDwarfForge(below))
+            return getInputChest(below);
+
+        // No input chest.
+        return null;
+    }
+
+    // Blocks are loaded from chest stage-right of the forge (i.e. face "next" from forward).
+    private void refill(Block forge) {
+        Furnace state = (Furnace) forge.getState();
+
+        Block input = getInputChest(forge);
+        if (input != null) {
+            Chest chest = (Chest) input.getState();
+
+            Inventory forgeInv = state.getInventory();
+            Inventory chestInv = chest.getInventory();
 
             // Find from chest a smeltable/cookable item.
             for (int i = 0; i < smeltables.length; ++i) {
-                if (rightInv.contains(smeltables[i])) {
-                    int slot = rightInv.first(smeltables[i]);
-                    ItemStack item = rightInv.getItem(slot);
+                if (chestInv.contains(smeltables[i])) {
+                    int slot = chestInv.first(smeltables[i]);
+                    ItemStack item = chestInv.getItem(slot);
 
-                    furnInv.setItem(RAW_SLOT, rightInv.getItem(slot));
-                    rightInv.clear(slot);
+                    forgeInv.setItem(RAW_SLOT, chestInv.getItem(slot));
+                    chestInv.clear(slot);
                     break;
                 }
             }
