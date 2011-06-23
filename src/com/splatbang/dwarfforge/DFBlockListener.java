@@ -219,7 +219,7 @@ public class DFBlockListener extends BlockListener implements Runnable {
         Material.GOLD_ORE,
         Material.SAND,
         Material.COBBLESTONE,
-        Material.CLAY,
+        Material.CLAY_BALL,
         Material.PORK,
         Material.RAW_FISH,
         Material.LOG,
