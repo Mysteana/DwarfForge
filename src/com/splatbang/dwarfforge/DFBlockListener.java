@@ -13,9 +13,11 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
+import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
 import org.bukkit.inventory.Inventory;
@@ -50,17 +52,56 @@ public class DFBlockListener extends BlockListener implements Runnable {
         this.plugin = plugin;
     }
 
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (event.isCancelled())
+            return;
+
+        Player player = event.getPlayer();
+        Block block = event.getBlockPlaced();
+        Material type = block.getType();
+
+        boolean attemptToBuildForge = false;
+
+        if (type == Material.FURNACE || type == Material.BURNING_FURNACE) {
+            Block below = block.getRelative(BlockFace.DOWN);
+            attemptToBuildForge =
+                isDwarfForge(below)
+                || (below.getType() == Material.LAVA)
+                || (below.getType() == Material.STATIONARY_LAVA);
+        }
+        else if (type == Material.LAVA || type == Material.STATIONARY_LAVA) {
+            Block above = block.getRelative(BlockFace.UP);
+            attemptToBuildForge =
+                (above.getType() == Material.FURNACE)
+                || (above.getType() == Material.BURNING_FURNACE);
+        }
+
+        if (!attemptToBuildForge)
+            return;
+
+        if (!plugin.playerHasPermission(player, "dwarfforge.create")) {
+            event.setCancelled(true);
+            player.sendMessage("Ye have not the strength of the Dwarfs required to create such a forge.");
+        }
+    }
+
     public void onBlockDamage(BlockDamageEvent event) {
         if (event.isCancelled())
             return;
 
+        Player player = event.getPlayer();
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            if (isBurning(block))
-                douse(block);
-            else
-                ignite(block);
+            if (plugin.playerHasPermission(player, "dwarfforge.use")) {
+                if (isBurning(block))
+                    douse(block);
+                else
+                    ignite(block);
+            }
+            else {
+                player.sendMessage("Ye have not the will of the Dwarfs required to use such a forge.");
+            }
         }
     }
 
@@ -68,10 +109,17 @@ public class DFBlockListener extends BlockListener implements Runnable {
         if (event.isCancelled())
             return;
 
+        Player player = event.getPlayer();
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            douse(block);
+            if (plugin.playerHasPermission(player, "dwarfforge.destroy")) {
+                douse(block);
+            }
+            else {
+                event.setCancelled(true);
+                player.sendMessage("Ye have not the might of the Dwarfs required to destroy such a forge.");
+            }
         }
     }
 
