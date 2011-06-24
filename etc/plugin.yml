@@ -1,6 +1,6 @@
 name: DwarfForge
 main: com.splatbang.dwarfforge.DwarfForge
-version: 0.9-perm
+version: 0.8-perm-1
 
 commands:
 
