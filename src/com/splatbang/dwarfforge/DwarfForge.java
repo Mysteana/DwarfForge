@@ -3,25 +3,31 @@ package com.splatbang.dwarfforge;
 import java.lang.String;
 import java.util.logging.Logger;
 
-import org.bukkit.event.Event;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.config.Configuration;
 
 
 public class DwarfForge extends JavaPlugin {
-    public static Logger log = Logger.getLogger("Minecraft");
 
-    private DFBlockListener blockListener = new DFBlockListener(this);
+    private Logger log = Logger.getLogger("Minecraft");
+    private DFBlockListener blockListener = new DFBlockListener();
+
+    public DFPermissions permission = new DFPermissions();
+    public Configuration config = null;
+
 
     @Override
     public void onEnable() {
-        PluginManager pm = getServer().getPluginManager();
-        pm.registerEvent(Event.Type.BLOCK_BREAK,  blockListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.BLOCK_DAMAGE, blockListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.BLOCK_IGNITE, blockListener, Event.Priority.Normal, this);
+        config = getConfiguration();
 
-        blockListener.startTask();
+        permission.enable(this);
+        blockListener.enable(this);
+
+        // If the config file didn't exist, this will write the default back to disk.
+        config.save();
 
         PluginDescriptionFile pdf = this.getDescription();
         logInfo("Version " + pdf.getVersion() + " enabled.");
@@ -29,7 +35,9 @@ public class DwarfForge extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        blockListener.stopTask();
+        blockListener.disable();
+        permission.disable();
+        config = null;
 
         logInfo("Disabled.");
     }

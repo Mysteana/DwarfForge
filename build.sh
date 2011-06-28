@@ -4,13 +4,11 @@ if [ ! -d obj ]; then
     mkdir obj
 fi
 
-echo "-d obj -Xlint" > opts
-find lib -name "*.jar" | sed -e 's/^/-cp /' >> opts
 find src -name "*.java" > srcs
 set -x
-if javac @opts @srcs; then
+if javac -d obj/ -extdirs lib/ -Xlint @srcs; then
     jar cf DwarfForge.jar -C obj . -C etc .
 fi
 set +x
-rm opts srcs
+rm srcs
 

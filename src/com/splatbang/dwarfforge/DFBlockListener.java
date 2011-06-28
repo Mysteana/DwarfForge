@@ -13,15 +13,19 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
 import org.bukkit.material.FurnaceAndDispenser;
+import org.bukkit.plugin.PluginManager;
 
 
 public class DFBlockListener extends BlockListener implements Runnable {
@@ -41,26 +45,94 @@ public class DFBlockListener extends BlockListener implements Runnable {
     private static final List<BlockFace> dirs = Arrays.asList(
         BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST);
 
-    private DwarfForge plugin;
+    private static final Material[] smeltables = {
+        Material.DIAMOND_ORE,
+        Material.IRON_ORE,
+        Material.GOLD_ORE,
+        Material.SAND,
+        Material.COBBLESTONE,
+        Material.CLAY_BALL,
+        Material.PORK,
+        Material.RAW_FISH,
+        Material.LOG,
+        Material.CACTUS,
+    };
+
+    private DwarfForge main;
     private ArrayList<Block> forges = new ArrayList<Block>();
     private int task = INVALID_TASK;
 
 
-    public DFBlockListener(DwarfForge plugin) {
-        this.plugin = plugin;
+    public void enable(DwarfForge main) {
+        this.main = main;
+
+        registerEvents();
+        startTask();
+    }
+
+    public void disable() {
+        stopTask();
+    }
+
+    private void registerEvents() {
+        PluginManager manager = main.getServer().getPluginManager();
+
+        manager.registerEvent(Event.Type.BLOCK_PLACE,  this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_BREAK,  this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_DAMAGE, this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_IGNITE, this, Event.Priority.Normal, main);
+    }
+
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (event.isCancelled())
+            return;
+
+        Player player = event.getPlayer();
+        Block block = event.getBlockPlaced();
+        Material type = block.getType();
+
+        boolean attemptToBuildForge = false;
+
+        if (type == Material.FURNACE || type == Material.BURNING_FURNACE) {
+            Block below = block.getRelative(BlockFace.DOWN);
+            attemptToBuildForge =
+                isDwarfForge(below)
+                || (below.getType() == Material.LAVA)
+                || (below.getType() == Material.STATIONARY_LAVA);
+        }
+        else if (type == Material.LAVA || type == Material.STATIONARY_LAVA) {
+            Block above = block.getRelative(BlockFace.UP);
+            attemptToBuildForge =
+                (above.getType() == Material.FURNACE)
+                || (above.getType() == Material.BURNING_FURNACE);
+        }
+
+        if (!attemptToBuildForge)
+            return;
+
+        if (!main.permission.allow(player, "dwarfforge.create")) {
+            event.setCancelled(true);
+            player.sendMessage("Ye have not the strength of the Dwarfs to create such a forge.");
+        }
     }
 
     public void onBlockDamage(BlockDamageEvent event) {
         if (event.isCancelled())
             return;
 
+        Player player = event.getPlayer();
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            if (isBurning(block))
-                douse(block);
-            else
-                ignite(block);
+            if (main.permission.allow(player, "dwarfforge.use")) {
+                if (isBurning(block))
+                    douse(block);
+                else
+                    ignite(block);
+            }
+            else {
+                player.sendMessage("Ye have not the will of the Dwarfs to use such a forge.");
+            }
         }
     }
 
@@ -68,10 +140,17 @@ public class DFBlockListener extends BlockListener implements Runnable {
         if (event.isCancelled())
             return;
 
+        Player player = event.getPlayer();
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            douse(block);
+            if (main.permission.allow(player, "dwarfforge.destroy")) {
+                douse(block);
+            }
+            else {
+                event.setCancelled(true);
+                player.sendMessage("Ye have not the might of the Dwarfs to destroy such a forge.");
+            }
         }
     }
 
@@ -231,19 +310,6 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
-    static final private Material[] smeltables = {
-        Material.DIAMOND_ORE,
-        Material.IRON_ORE,
-        Material.GOLD_ORE,
-        Material.SAND,
-        Material.COBBLESTONE,
-        Material.CLAY_BALL,
-        Material.PORK,
-        Material.RAW_FISH,
-        Material.LOG,
-        Material.CACTUS,
-    };
-
     private Block getInputChest(Block forge) {
         Furnace state = (Furnace) forge.getState();
         BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
@@ -311,14 +377,14 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
-    public void startTask() {
-        task = plugin.getServer().getScheduler()
-            .scheduleSyncRepeatingTask(plugin, this, 0, TASK_DURATION);
+    private void startTask() {
+        task = main.getServer().getScheduler()
+            .scheduleSyncRepeatingTask(main, this, 0, TASK_DURATION);
     }
 
-    public void stopTask() {
+    private void stopTask() {
         if (task != INVALID_TASK) {
-            plugin.getServer().getScheduler().cancelTask(task);
+            main.getServer().getScheduler().cancelTask(task);
             task = INVALID_TASK;
         }
     }
