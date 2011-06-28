@@ -14,6 +14,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
@@ -24,6 +25,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
 import org.bukkit.material.FurnaceAndDispenser;
+import org.bukkit.plugin.PluginManager;
 
 
 public class DFBlockListener extends BlockListener implements Runnable {
@@ -43,13 +45,42 @@ public class DFBlockListener extends BlockListener implements Runnable {
     private static final List<BlockFace> dirs = Arrays.asList(
         BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST);
 
-    private DwarfForge plugin;
+    private static final Material[] smeltables = {
+        Material.DIAMOND_ORE,
+        Material.IRON_ORE,
+        Material.GOLD_ORE,
+        Material.SAND,
+        Material.COBBLESTONE,
+        Material.CLAY_BALL,
+        Material.PORK,
+        Material.RAW_FISH,
+        Material.LOG,
+        Material.CACTUS,
+    };
+
+    private DwarfForge main;
     private ArrayList<Block> forges = new ArrayList<Block>();
     private int task = INVALID_TASK;
 
 
-    public DFBlockListener(DwarfForge plugin) {
-        this.plugin = plugin;
+    public void enable(DwarfForge main) {
+        this.main = main;
+
+        registerEvents();
+        startTask();
+    }
+
+    public void disable() {
+        stopTask();
+    }
+
+    private void registerEvents() {
+        PluginManager manager = main.getServer().getPluginManager();
+
+        manager.registerEvent(Event.Type.BLOCK_PLACE,  this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_BREAK,  this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_DAMAGE, this, Event.Priority.Normal, main);
+        manager.registerEvent(Event.Type.BLOCK_IGNITE, this, Event.Priority.Normal, main);
     }
 
     public void onBlockPlace(BlockPlaceEvent event) {
@@ -79,9 +110,9 @@ public class DFBlockListener extends BlockListener implements Runnable {
         if (!attemptToBuildForge)
             return;
 
-        if (!plugin.playerHasPermission(player, "dwarfforge.create")) {
+        if (!main.permission.allow(player, "dwarfforge.create")) {
             event.setCancelled(true);
-            player.sendMessage("Ye have not the strength of the Dwarfs required to create such a forge.");
+            player.sendMessage("Ye have not the strength of the Dwarfs to create such a forge.");
         }
     }
 
@@ -93,14 +124,14 @@ public class DFBlockListener extends BlockListener implements Runnable {
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            if (plugin.playerHasPermission(player, "dwarfforge.use")) {
+            if (main.permission.allow(player, "dwarfforge.use")) {
                 if (isBurning(block))
                     douse(block);
                 else
                     ignite(block);
             }
             else {
-                player.sendMessage("Ye have not the will of the Dwarfs required to use such a forge.");
+                player.sendMessage("Ye have not the will of the Dwarfs to use such a forge.");
             }
         }
     }
@@ -113,12 +144,12 @@ public class DFBlockListener extends BlockListener implements Runnable {
         Block block = event.getBlock();
 
         if (isDwarfForge(block)) {
-            if (plugin.playerHasPermission(player, "dwarfforge.destroy")) {
+            if (main.permission.allow(player, "dwarfforge.destroy")) {
                 douse(block);
             }
             else {
                 event.setCancelled(true);
-                player.sendMessage("Ye have not the might of the Dwarfs required to destroy such a forge.");
+                player.sendMessage("Ye have not the might of the Dwarfs to destroy such a forge.");
             }
         }
     }
@@ -279,19 +310,6 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
-    static final private Material[] smeltables = {
-        Material.DIAMOND_ORE,
-        Material.IRON_ORE,
-        Material.GOLD_ORE,
-        Material.SAND,
-        Material.COBBLESTONE,
-        Material.CLAY_BALL,
-        Material.PORK,
-        Material.RAW_FISH,
-        Material.LOG,
-        Material.CACTUS,
-    };
-
     private Block getInputChest(Block forge) {
         Furnace state = (Furnace) forge.getState();
         BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
@@ -359,14 +377,14 @@ public class DFBlockListener extends BlockListener implements Runnable {
         }
     }
 
-    public void startTask() {
-        task = plugin.getServer().getScheduler()
-            .scheduleSyncRepeatingTask(plugin, this, 0, TASK_DURATION);
+    private void startTask() {
+        task = main.getServer().getScheduler()
+            .scheduleSyncRepeatingTask(main, this, 0, TASK_DURATION);
     }
 
-    public void stopTask() {
+    private void stopTask() {
         if (task != INVALID_TASK) {
-            plugin.getServer().getScheduler().cancelTask(task);
+            main.getServer().getScheduler().cancelTask(task);
             task = INVALID_TASK;
         }
     }
