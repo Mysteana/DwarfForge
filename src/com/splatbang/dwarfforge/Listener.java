@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -72,7 +73,7 @@ public class Listener implements Runnable {
         new DFInventoryListener()
     };
 
-    private ArrayList<Block> forges = new ArrayList<Block>();
+    private HashSet<Location> activeForges = new HashSet<Location>();
     private int task = INVALID_TASK;
 
 
@@ -87,11 +88,11 @@ public class Listener implements Runnable {
     }
 
     public void disable() {
+        stopTask();
+
         for (DFListener listener : listeners) {
             listener.onDisable();
         }
-
-        stopTask();
     }
 
     private void startTask() {
@@ -107,16 +108,13 @@ public class Listener implements Runnable {
 
     @Override
     public void run() {
-        Iterator<Block> it = forges.iterator();
+        Iterator<Location> it = activeForges.iterator();
         while (it.hasNext()) {
-            Block forge = it.next();
+            Block forge = it.next().getBlock();
 
             // It's possible for blocks in this list to change in such a way that
             // they are no longer forges. Remove the remembered forge to forget it.
             if (!isDwarfForge(forge)) {
-
-                // Remove from the forges list before calling douse. This is the
-                // only safe way to remove it from the list within the loop.
                 it.remove();
 
                 // No longer a forge, but still a burning furnace?
@@ -130,9 +128,6 @@ public class Listener implements Runnable {
 
             // Keep the forge burning.
             ignite(forge);
-
-            // Turn redstone power off.
-            redstoneOff(forge);
         }
     }
 
@@ -160,9 +155,6 @@ public class Listener implements Runnable {
 
             forge.setType(Material.BURNING_FURNACE);
 
-            if (!forges.contains(forge))
-                forges.add(forge);
-
             state = (Furnace) forge.getState();
             restoreInventory(state, stuff);
             state.setData(priorState.getData());
@@ -181,9 +173,6 @@ public class Listener implements Runnable {
         Furnace state = (Furnace) forge.getState();
         state.setBurnTime(ZERO_DURATION);
         state.update();
-
-        // Stop tracking the forge; otherwise our repeating task may relight it.
-        forges.remove(forge);
     }
 
     private boolean isBurning(Block block) {
@@ -241,7 +230,7 @@ public class Listener implements Runnable {
     }
 
     // Blocks are unloaded into chest stage-left of the forge (i.e. face "previous" to forward).
-    private void unload(Block forge) {
+    private void unload(final Block forge) {
         Furnace state = (Furnace) forge.getState();
 
         Block output = getOutputChest(forge);
@@ -268,9 +257,15 @@ public class Listener implements Runnable {
 
             int postCount = forgeInv.getItem(REFINED_SLOT).getAmount();
 
-            // Turn redstone power on.
-            if (postCount != preCount)
+            // Toggle lever/redstone power.
+            if (postCount != preCount) {
                 redstoneOn(forge);
+                main.queueDelayedTask(new Runnable() {
+                    public void run() {
+                        redstoneOff(forge);
+                    }
+                }, 1 * SECS);
+            }
         }
     }
 
@@ -304,7 +299,7 @@ public class Listener implements Runnable {
                 // Add to the furnace.
                 forgeInv.setItem(RAW_SLOT, items);
                 // Reload is done!
-                break;
+                return;
             }
         }
     }
@@ -344,9 +339,11 @@ public class Listener implements Runnable {
     private void toggleForge(Block forge) {
         if (isBurning(forge)) {
             douse(forge);
+            activeForges.remove(forge.getLocation());
         }
         else {
             ignite(forge);
+            activeForges.add(forge.getLocation());
         }
     }
 

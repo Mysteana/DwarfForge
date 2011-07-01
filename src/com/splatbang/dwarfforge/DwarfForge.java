@@ -55,6 +55,10 @@ public class DwarfForge extends JavaPlugin {
         return getServer().getScheduler().scheduleSyncDelayedTask(this, task);
     }
 
+    public int queueDelayedTask(Runnable task, long delay) {
+        return getServer().getScheduler().scheduleSyncDelayedTask(this, task, delay);
+    }
+
     public int queueRepeatingTask(Runnable task, short interval) {
         return getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 0, interval);
     }
