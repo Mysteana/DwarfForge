@@ -404,7 +404,7 @@ public class Listener implements Runnable {
             saveActiveForges();
         }
         else {
-            unload(forge);  // If refined, but no raw, we need this to unload.
+            //unload(forge);  // If refined, but no raw, we need this to unload.
             ignite(forge);
             activeForges.add(forge.getLocation());
             saveActiveForges();
