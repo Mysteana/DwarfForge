@@ -1,5 +1,11 @@
 package com.splatbang.dwarfforge;
 
+import java.io.EOFException;
+import java.io.File;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.lang.Runnable;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -85,9 +91,13 @@ public class Listener implements Runnable {
         }
 
         startTask();
+
+        restoreActiveForges();
     }
 
     public void disable() {
+        saveActiveForges();
+
         stopTask();
 
         for (DFListener listener : listeners) {
@@ -108,6 +118,8 @@ public class Listener implements Runnable {
 
     @Override
     public void run() {
+        boolean forceSave = false;
+
         Iterator<Location> it = activeForges.iterator();
         while (it.hasNext()) {
             Block forge = it.next().getBlock();
@@ -122,12 +134,18 @@ public class Listener implements Runnable {
                     douse(forge);
                 }
 
+                forceSave = true;
+
                 // Not a forge; do nothing else to this particular block.
                 continue;
             }
 
             // Keep the forge burning.
             ignite(forge);
+        }
+
+        if (forceSave) {
+            saveActiveForges();
         }
     }
 
@@ -336,14 +354,60 @@ public class Listener implements Runnable {
         return false;
     }
 
+    private void saveActiveForges() {
+        try {
+            File fout = new File(main.getDataFolder(), "active_forges");
+            DataOutputStream out = new DataOutputStream(new FileOutputStream(fout));
+            for (Location loc : activeForges) {
+                out.writeUTF(loc.getWorld().getName());
+                out.writeDouble(loc.getX());
+                out.writeDouble(loc.getY());
+                out.writeDouble(loc.getZ());
+            }
+            out.close();
+        }
+        catch (Exception e) {
+            main.logSevere("Could not save active forges to file: " + e);
+        }
+    }
+
+    private void restoreActiveForges() {
+        try {
+            File fin = new File(main.getDataFolder(), "active_forges");
+            DataInputStream in = new DataInputStream(new FileInputStream(fin));
+            int count = 0;
+            while (true) {
+                try {
+                    String name = in.readUTF();
+                    double x = in.readDouble();
+                    double y = in.readDouble();
+                    double z = in.readDouble();
+                    activeForges.add(new Location(main.getServer().getWorld(name), x, y, z));
+                    count += 1;
+                }
+                catch (EOFException e) {
+                    break;
+                }
+            }
+            in.close();
+            main.logInfo("Restored " + count + " active, running forges.");
+        }
+        catch (Exception e) {
+            main.logSevere("Something went wrong with file while restoring forges: " + e);
+        }
+    }
+
     private void toggleForge(Block forge) {
         if (isBurning(forge)) {
             douse(forge);
             activeForges.remove(forge.getLocation());
+            saveActiveForges();
         }
         else {
+            unload(forge);  // If refined, but no raw, we need this to unload.
             ignite(forge);
             activeForges.add(forge.getLocation());
+            saveActiveForges();
         }
     }
 
