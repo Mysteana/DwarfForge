@@ -253,7 +253,7 @@ public class Listener implements Runnable {
 
         Block output = getOutputChest(forge);
         if (output != null) {
-            Chest chest = (Chest) output.getState();
+            BetterChest chest = new BetterChest( (Chest) output.getState() );
 
             Inventory forgeInv = state.getInventory();
             Inventory chestInv = chest.getInventory();
@@ -302,7 +302,7 @@ public class Listener implements Runnable {
         if (input == null)
             return;
 
-        Chest chest = (Chest) input.getState();
+        BetterChest chest = new BetterChest( (Chest) input.getState() );
         Inventory chestInv = chest.getInventory();
 
         // Find the first smeltable item in the chest.
