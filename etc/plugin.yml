@@ -1,6 +1,6 @@
 name: DwarfForge
 main: com.splatbang.dwarfforge.DwarfForge
-version: 1.1
+version: 1.2
 
 commands:
 

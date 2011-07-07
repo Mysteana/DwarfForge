@@ -414,8 +414,12 @@ public class Listener implements Runnable {
     //------------------------------
 
     class DFInventoryListener extends InventoryListener implements DFListener {
+        private final static double DEFAULT_COOK_TIME = 9.25;
+        private double cookTime;    // in seconds
+
         @Override
         public void onEnable() {
+            cookTime =  main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
             main.registerEvent(Event.Type.FURNACE_SMELT, this, Event.Priority.Monitor);
         }
 
@@ -438,6 +442,10 @@ public class Listener implements Runnable {
                 public void run() {
                     unload(furnace);
                     reload(furnace);
+
+                    // setCookTime sets time elapsed, not time remaining.
+                    short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * SECS);
+                    ((Furnace) furnace.getState()).setCookTime(dt);
                 }
             });
         }
