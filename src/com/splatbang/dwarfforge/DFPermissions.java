@@ -23,7 +23,13 @@ public class DFPermissions {
             else {
                 Permissions perm = (Permissions) plugin;
                 handler = perm.getHandler();
-                main.logInfo("Loaded " + perm.name + ", version " + perm.version);
+                try {
+                    main.logInfo("Using " + perm.name + ", version " + perm.version);
+                }
+                catch (NoSuchFieldError e) {
+                    // PermissionsEx Compatibility layer doesn't replicate 'name' field.
+                    main.logInfo("Using PermissionsEx Compatibility layer, version " + perm.version);
+                }
             }
         }
         else {
