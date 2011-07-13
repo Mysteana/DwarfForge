@@ -233,6 +233,11 @@ public class Listener implements Runnable {
         if (isDwarfForge(below))
             return getForgeChest(below, dir);
 
+        // If there is a forge adjacent (in provided direction) and it
+        // has a chest, use it.
+        if (isDwarfForge(adjacent))
+            return getForgeChest(adjacent, dir);
+
         // No chest.
         return null;
     }
