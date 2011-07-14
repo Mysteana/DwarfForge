@@ -264,7 +264,6 @@ public class Listener implements Runnable {
             Inventory chestInv = chest.getInventory();
 
             ItemStack item = forgeInv.getItem(REFINED_SLOT);
-            int preCount = item.getAmount();
 
             // Remove the item from the furnace.
             forgeInv.clear(REFINED_SLOT);
@@ -276,18 +275,6 @@ public class Listener implements Runnable {
             if (!remains.isEmpty()) {
                 // NO. Put back what remains into the refined slot.
                 forgeInv.setItem(REFINED_SLOT, remains.get(0));
-            }
-
-            int postCount = forgeInv.getItem(REFINED_SLOT).getAmount();
-
-            // Toggle lever/redstone power.
-            if (postCount != preCount) {
-                redstoneOn(forge);
-                main.queueDelayedTask(new Runnable() {
-                    public void run() {
-                        redstoneOff(forge);
-                    }
-                }, 1 * SECS);
             }
         }
     }
@@ -324,30 +311,6 @@ public class Listener implements Runnable {
                 // Reload is done!
                 return;
             }
-        }
-    }
-
-    private void redstoneOff(Block forge) {
-        Furnace state = (Furnace) forge.getState();
-        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
-
-        // Check for a lever behind the forge.
-        Block behind = forge.getRelative(forward.getOppositeFace());
-        if (isBlockOfType(behind, Material.LEVER)) {
-            // Turn the lever to OFF setting.
-            behind.setData((byte) (behind.getData() & ~0x8));    // clear ON bit
-        }
-    }
-
-    private void redstoneOn(Block forge) {
-        Furnace state = (Furnace) forge.getState();
-        BlockFace forward = ((FurnaceAndDispenser) state.getData()).getFacing();
-
-        // Check for a lever behind the forge.
-        Block behind = forge.getRelative(forward.getOppositeFace());
-        if (isBlockOfType(behind, Material.LEVER)) {
-            // Turn the lever to ON setting.
-            behind.setData((byte) (behind.getData() | 0x8));    // set ON bit
         }
     }
 
