@@ -22,6 +22,7 @@
 
 package com.splatbang.dwarfforge;
 
+
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -103,7 +104,7 @@ public class BetterChest implements Chest {
 
     // Methods inherited from ContainerBlock
     public Inventory getInventory() {
-        Chest other = attached();
+        Chest other = findAttachedChest();
         if (other == null) {
             return ref.getInventory();
         }
@@ -123,7 +124,7 @@ public class BetterChest implements Chest {
         this.ref = ref;
     }
     
-    private Chest attached() {
+    private Chest findAttachedChest() {
         // Find the first adjacent chest. Note: hacking of various sorts/degrees and/or
         // other plugins might allow multiple chests to be adjacent. Deal with that later
         // if it really becomes necessary (and at all possible to detect).
