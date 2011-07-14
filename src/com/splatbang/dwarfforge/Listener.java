@@ -31,6 +31,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
 import org.bukkit.event.inventory.InventoryListener;
+import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -66,6 +67,28 @@ public class Listener implements Runnable {
             Material.RAW_FISH,
             Material.LOG,
             Material.CACTUS,
+        }));
+
+    private static final Set<Material> TYPICAL_FUELS = new HashSet<Material>(Arrays.asList(
+        new Material[] {
+            Material.COAL,
+            Material.WOOD,
+            Material.SAPLING,
+            Material.STICK,
+            Material.LOG,
+            Material.LAVA_BUCKET,
+        }));
+        
+    private static final Set<Material> CRAFTED_FUELS = new HashSet<Material>(Arrays.asList(
+        new Material[] {
+            Material.FENCE,
+            Material.WOOD_STAIRS,
+            Material.TRAP_DOOR,
+            Material.CHEST,
+            Material.LOCKED_CHEST,
+            Material.NOTE_BLOCK,
+            Material.JUKEBOX,
+            Material.BOOKSHELF,
         }));
 
     private interface DFListener {
@@ -422,14 +445,50 @@ public class Listener implements Runnable {
         private final static double DEFAULT_COOK_TIME = 9.25;
         private double cookTime;    // in seconds
 
+        private final static boolean DEFAULT_REQUIRE_FUEL = false;
+        private boolean requireFuel;
+
+        private final static boolean DEFAULT_USE_CRAFTED_FUEL = false;
+        private boolean useCraftedFuel;
+
         @Override
         public void onEnable() {
-            cookTime =  main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
+            cookTime = main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
+            useCraftedFuel = main.config.getBoolean("DwarfForge.fuel.allow-crafted-items",
+                DEFAULT_USE_CRAFTED_FUEL);
+            requireFuel = main.config.getBoolean("DwarfForge.fuel.require", DEFAULT_REQUIRE_FUEL);
+
+            main.registerEvent(Event.Type.FURNACE_BURN,  this, Event.Priority.Monitor);
             main.registerEvent(Event.Type.FURNACE_SMELT, this, Event.Priority.Monitor);
         }
 
         @Override
         public void onDisable() { }
+
+        @Override
+        public void onFurnaceBurn(FurnaceBurnEvent event) {
+            // NOTE: This identifies the START of a fuel burning event, not its
+            // completion. Still, it's a good opportunity to reload the fuel slot
+            // if it is now empty.
+
+            // Monitoring event: do nothing if event was cancelled.
+            if (event.isCancelled())
+                return;
+
+            // Do nothing if fuel is not required.
+            if (!requireFuel)
+                return;
+
+            // Do nothing if the furnace isn't a Dwarf Forge.
+            final Block furnace = event.getFurnace();
+            if (!isDwarfForge(furnace))
+                return;
+
+            main.logInfo("Fuel burn event: ");
+            main.logInfo("  " + event.getFuel());
+            //main.logInfo("  burning? " + event.isBurning());
+            main.logInfo("  " + event.getBurnTime());
+        }
 
         @Override
         public void onFurnaceSmelt(FurnaceSmeltEvent event) {
