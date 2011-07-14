@@ -1,3 +1,25 @@
+/*
+    Copyright (C) 2011 by Matthew D Moss
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+*/
+
 package com.splatbang.dwarfforge;
 
 import java.io.EOFException;
@@ -24,14 +46,6 @@ import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
-import org.bukkit.event.block.BlockListener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockDamageEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.block.BlockIgniteEvent;
-import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
-import org.bukkit.event.inventory.InventoryListener;
-import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.MaterialData;
@@ -40,8 +54,8 @@ import org.bukkit.material.FurnaceAndDispenser;
 
 public class Listener implements Runnable {
     private static final int INVALID_TASK = -1;
-    private static final short SECS = 20;
-    private static final short MINS = 60 * SECS;
+    static final short SECS = 20;
+    static final short MINS = 60 * SECS;
 
     private static final short ZERO_DURATION = 1;           // Yeah, I should explain this...
     private static final short TASK_DURATION = 1 * SECS;    // This should be less than burn duration.
@@ -68,18 +82,13 @@ public class Listener implements Runnable {
             Material.CACTUS,
         }));
 
-    private interface DFListener {
-        void onEnable();
-        void onDisable();
-    }
-
-    private DwarfForge main;
+    static DwarfForge main;
     private DFListener[] listeners = {
         new DFBlockListener(),
         new DFInventoryListener()
     };
 
-    private HashSet<Location> activeForges = new HashSet<Location>();
+    static HashSet<Location> activeForges = new HashSet<Location>();
     private int task = INVALID_TASK;
 
 
@@ -87,7 +96,7 @@ public class Listener implements Runnable {
         this.main = main;
 
         for (DFListener listener : listeners) {
-            listener.onEnable();
+            listener.onEnable(main);
         }
 
         startTask();
@@ -149,7 +158,7 @@ public class Listener implements Runnable {
         }
     }
 
-    private boolean isDwarfForge(Block block) {
+    static boolean isDwarfForge(Block block) {
         // Can't be a Dwarf Forge if it isn't a furnace.
         if (!isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE))
             return false;
@@ -160,7 +169,7 @@ public class Listener implements Runnable {
             || isDwarfForge(below);
     }
 
-    private void ignite(Block forge) {
+    static void ignite(Block forge) {
         Furnace state = (Furnace) forge.getState();
 
         // Setting the block type causes the furnace to drop
@@ -186,43 +195,43 @@ public class Listener implements Runnable {
         reload(forge);
     }
 
-    private void douse(Block forge) {
+    static void douse(Block forge) {
         // Easy way to douse a forge is simply to set a "zero" duration.
         Furnace state = (Furnace) forge.getState();
         state.setBurnTime(ZERO_DURATION);
         state.update();
     }
 
-    private boolean isBurning(Block block) {
+    static boolean isBurning(Block block) {
         return isBlockOfType(block, Material.BURNING_FURNACE);
     }
 
-    private void clearInventory(Furnace furnace) {
+    static void clearInventory(Furnace furnace) {
         furnace.getInventory().clear();
     }
 
-    private ItemStack[] saveInventory(Furnace furnace) {
+    static ItemStack[] saveInventory(Furnace furnace) {
         return furnace.getInventory().getContents();
     }
 
-    private void restoreInventory(Furnace furnace, ItemStack[] stuff) {
+    static void restoreInventory(Furnace furnace, ItemStack[] stuff) {
         furnace.getInventory().setContents(stuff);
     }
 
-    private BlockFace nextFace(BlockFace forward) {
+    static BlockFace nextFace(BlockFace forward) {
         return DIRS.get((DIRS.indexOf(forward) + 1) % DIRS.size());
     }
 
-    private BlockFace prevFace(BlockFace forward) {
+    static BlockFace prevFace(BlockFace forward) {
         return DIRS.get((DIRS.indexOf(forward) + 3) % DIRS.size());
     }
 
-    private BlockFace getForward(Block forge) {
+    static BlockFace getForward(Block forge) {
         Furnace state = (Furnace) forge.getState();
         return ((FurnaceAndDispenser) state.getData()).getFacing();
     }
 
-    private Block getForgeChest(Block forge, BlockFace dir) {
+    static Block getForgeChest(Block forge, BlockFace dir) {
         // If the adjacent block is a chest, use it.
         Block adjacent = forge.getRelative(dir);
         if (isBlockOfType(adjacent, Material.CHEST))
@@ -242,18 +251,18 @@ public class Listener implements Runnable {
         return null;
     }
 
-    private Block getInputChest(Block forge) {
+    static Block getInputChest(Block forge) {
         // Look for a chest stage-right (i.e. "next" face);
         return getForgeChest(forge, nextFace(getForward(forge)));
     }
 
-    private Block getOutputChest(Block forge) {
+    static Block getOutputChest(Block forge) {
         // Look for a chest stage-left (i.e. "prev" face).
         return getForgeChest(forge, prevFace(getForward(forge)));
     }
 
     // Blocks are unloaded into chest stage-left of the forge (i.e. face "previous" to forward).
-    private void unload(final Block forge) {
+    static void unload(final Block forge) {
         Furnace state = (Furnace) forge.getState();
 
         Block output = getOutputChest(forge);
@@ -280,7 +289,7 @@ public class Listener implements Runnable {
     }
 
     // Blocks are loaded from chest stage-right of the forge (i.e. face "next" from forward).
-    private void reload(Block forge) {
+    static void reload(Block forge) {
         Furnace state = (Furnace) forge.getState();
         Inventory forgeInv = state.getInventory();
 
@@ -314,7 +323,7 @@ public class Listener implements Runnable {
         }
     }
 
-    private boolean isBlockOfType(Block block, Material... types) {
+    static boolean isBlockOfType(Block block, Material... types) {
         for (Material type : types) {
             if (block.getType() == type)
                 return true;
@@ -322,7 +331,7 @@ public class Listener implements Runnable {
         return false;
     }
 
-    private void saveActiveForges() {
+    static void saveActiveForges() {
         try {
             File fout = new File(main.getDataFolder(), "active_forges");
             DataOutputStream out = new DataOutputStream(new FileOutputStream(fout));
@@ -339,7 +348,7 @@ public class Listener implements Runnable {
         }
     }
 
-    private void restoreActiveForges() {
+    static void restoreActiveForges() {
         try {
             File fin = new File(main.getDataFolder(), "active_forges");
             DataInputStream in = new DataInputStream(new FileInputStream(fin));
@@ -365,177 +374,16 @@ public class Listener implements Runnable {
         }
     }
 
-    private void toggleForge(Block forge) {
+    static void toggleForge(Block forge) {
         if (isBurning(forge)) {
             douse(forge);
             activeForges.remove(forge.getLocation());
             saveActiveForges();
         }
         else {
-            //unload(forge);  // If refined, but no raw, we need this to unload.
             ignite(forge);
             activeForges.add(forge.getLocation());
             saveActiveForges();
-        }
-    }
-
-    //------------------------------
-
-    class DFInventoryListener extends InventoryListener implements DFListener {
-        private final static double DEFAULT_COOK_TIME = 9.25;
-        private double cookTime;    // in seconds
-
-        @Override
-        public void onEnable() {
-            cookTime =  main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
-            main.registerEvent(Event.Type.FURNACE_SMELT, this, Event.Priority.Monitor);
-        }
-
-        @Override
-        public void onDisable() { }
-
-        @Override
-        public void onFurnaceSmelt(FurnaceSmeltEvent event) {
-            // Monitoring event: do nothing if event was cancelled.
-            if (event.isCancelled())
-                return;
-
-            // Do nothing if the furnace isn't a Dwarf Forge.
-            final Block furnace = event.getFurnace();
-            if (!isDwarfForge(furnace))
-                return;
-
-            // Queue up task to unload and reload the furnace.
-            main.queueTask(new Runnable() {
-                public void run() {
-                    unload(furnace);
-                    reload(furnace);
-
-                    // setCookTime sets time elapsed, not time remaining.
-                    short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * SECS);
-                    ((Furnace) furnace.getState()).setCookTime(dt);
-                }
-            });
-        }
-    }
-
-    //------------------------------
-
-    class DFBlockListener extends BlockListener implements DFListener {
-        @Override
-        public void onEnable() {
-            main.registerEvent(Event.Type.BLOCK_PLACE,  this, Event.Priority.Normal);
-            main.registerEvent(Event.Type.BLOCK_BREAK,  this, Event.Priority.Normal);
-            main.registerEvent(Event.Type.BLOCK_DAMAGE, this, Event.Priority.Monitor);
-            main.registerEvent(Event.Type.BLOCK_IGNITE, this, Event.Priority.Normal);
-        }
-
-        @Override
-        public void onDisable() { }
-
-        @Override
-        public void onBlockPlace(BlockPlaceEvent event) {
-            // If the event was already cancelled, we're not going to change that status.
-            if (event.isCancelled())
-                return;
-
-            Block block = event.getBlockPlaced();
-            boolean attemptToBuildForge = false;
-
-            if (isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE)) {
-                attemptToBuildForge = isDwarfForge(block);
-            }
-            else if (isBlockOfType(block, Material.LAVA, Material.STATIONARY_LAVA)) {
-                attemptToBuildForge = isDwarfForge(block.getRelative(BlockFace.UP));
-            }
-
-            // If the player was not attempting to build a Dwarf Forge, ignore the event.
-            if (!attemptToBuildForge)
-                return;
-
-            // Does the player have permission?
-            Player player = event.getPlayer();
-            if (!main.permission.allow(player, "dwarfforge.create")) {
-                // No: cancel the event.
-                event.setCancelled(true);
-                player.sendMessage("Ye have not the strength of the Dwarfs to create such a forge.");
-            }
-        }
-
-        @Override
-        public void onBlockBreak(BlockBreakEvent event) {
-            // If event was already cancelled, we're not going to change that status.
-            if (event.isCancelled())
-                return;
-
-            // If the player was not attempting to destroy a Dwarf Forge, ignore the event.
-            Block block = event.getBlock();
-            if (!isDwarfForge(block))
-                return;
-
-            // Does the player have permission?
-            Player player = event.getPlayer();
-            if (!main.permission.allow(player, "dwarfforge.destroy")) {
-                // NO: cancel the event.
-                event.setCancelled(true);
-                player.sendMessage("Ye have not the might of the Dwarfs to destroy such a forge.");
-            }
-        }
-
-        @Override
-        public void onBlockDamage(BlockDamageEvent event) {
-            // Monitoring event: do nothing if event was cancelled.
-            if (event.isCancelled())
-                return;
-
-            // Do nothing if the furnace isn't a Dwarf Forge.
-            final Block block = event.getBlock();
-            if (!isDwarfForge(block))
-                return;
-
-            // Do nothing if the player hasn't permission to use the forge.
-            // Note that we do NOT cancel the event; only this plugin does no further work.
-            Player player = event.getPlayer();
-            if (!main.permission.allow(player, "dwarfforge.use")) {
-                player.sendMessage("Ye have not the will of the Dwarfs to use such a forge.");
-                return;
-            }
-
-            // Queue up task to toggle the forge.
-            main.queueTask(new Runnable() {
-                public void run() {
-                    toggleForge(block);
-                }
-            });
-        }
-
-        @Override
-        public void onBlockIgnite(BlockIgniteEvent event) {
-            // If event was already cancelled, we're not going to change that status.
-            if (event.isCancelled())
-                return;
-
-            // Ignore event if lava was not the cause.
-            if (event.getCause() != IgniteCause.LAVA)
-                return;
-
-            // If there is any Dwarf Forge within 3 radius, cancel the event.
-            // Yes, it's possible other exposed lava also nearby caused the
-            // event, but let's assume the Dwarfs are protecting the area around
-            // the Dwarf forge sufficiently.
-            Block block = event.getBlock();
-            for (int dx = -3; dx <= 3; ++dx) {
-                for (int dy = -3; dy <= 3; ++dy) {
-                    for (int dz = -3; dz <= 3; ++dz) {
-                        Block check = block.getRelative(dx, dy, dz);
-                        if (isDwarfForge(check)) {
-                            // Protect the block; cancel the ignite event.
-                            event.setCancelled(true);
-                            return;
-                        }
-                    }
-                }
-            }
         }
     }
 
