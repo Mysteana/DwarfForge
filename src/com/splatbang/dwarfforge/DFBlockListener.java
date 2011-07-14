@@ -63,11 +63,11 @@ class DFBlockListener extends BlockListener implements DFListener {
         Block block = event.getBlockPlaced();
         boolean attemptToBuildForge = false;
 
-        if (Listener.isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE)) {
-            attemptToBuildForge = Listener.isDwarfForge(block);
+        if (Utils.isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE)) {
+            attemptToBuildForge = Forge.isValid(block);
         }
-        else if (Listener.isBlockOfType(block, Material.LAVA, Material.STATIONARY_LAVA)) {
-            attemptToBuildForge = Listener.isDwarfForge(block.getRelative(BlockFace.UP));
+        else if (Utils.isBlockOfType(block, Material.LAVA, Material.STATIONARY_LAVA)) {
+            attemptToBuildForge = Forge.isValid(block.getRelative(BlockFace.UP));
         }
 
         // If the player was not attempting to build a Dwarf Forge, ignore the event.
@@ -91,7 +91,7 @@ class DFBlockListener extends BlockListener implements DFListener {
 
         // If the player was not attempting to destroy a Dwarf Forge, ignore the event.
         Block block = event.getBlock();
-        if (!Listener.isDwarfForge(block))
+        if (!Forge.isValid(block))
             return;
 
         // Does the player have permission?
@@ -111,7 +111,7 @@ class DFBlockListener extends BlockListener implements DFListener {
 
         // Do nothing if the furnace isn't a Dwarf Forge.
         final Block block = event.getBlock();
-        if (!Listener.isDwarfForge(block))
+        if (!Forge.isValid(block))
             return;
 
         // Do nothing if the player hasn't permission to use the forge.
@@ -149,7 +149,7 @@ class DFBlockListener extends BlockListener implements DFListener {
             for (int dy = -3; dy <= 3; ++dy) {
                 for (int dz = -3; dz <= 3; ++dz) {
                     Block check = block.getRelative(dx, dy, dz);
-                    if (Listener.isDwarfForge(check)) {
+                    if (Forge.isValid(check)) {
                         // Protect the block; cancel the ignite event.
                         event.setCancelled(true);
                         return;

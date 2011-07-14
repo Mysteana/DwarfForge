@@ -33,13 +33,18 @@ import org.bukkit.event.inventory.FurnaceSmeltEvent;
 
 class DFInventoryListener extends InventoryListener implements DFListener {
     private DwarfForge main;
+
     private final static double DEFAULT_COOK_TIME = 9.25;
     private double cookTime;    // in seconds
 
     @Override
     public void onEnable(DwarfForge main) {
         this.main = main;
-        cookTime =  main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
+
+        // Configuration options
+        cookTime = main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
+
+        // Event registration
         main.registerEvent(Event.Type.FURNACE_SMELT, this, Event.Priority.Monitor);
     }
 
@@ -53,19 +58,19 @@ class DFInventoryListener extends InventoryListener implements DFListener {
             return;
 
         // Do nothing if the furnace isn't a Dwarf Forge.
-        final Block furnace = event.getFurnace();
-        if (!Listener.isDwarfForge(furnace))
+        final Block block = event.getFurnace();
+        if (!Forge.isValid(block))
             return;
 
         // Queue up task to unload and reload the furnace.
         main.queueTask(new Runnable() {
             public void run() {
-                Listener.unload(furnace);
-                Listener.reload(furnace);
+                Forge.unloadProduct(block);
+                Forge.loadRawMaterial(block);
 
                 // setCookTime sets time elapsed, not time remaining.
-                short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * Listener.SECS);
-                ((Furnace) furnace.getState()).setCookTime(dt);
+                short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * Utils.SECS);
+                ((Furnace) block.getState()).setCookTime(dt);
             }
         });
     }
