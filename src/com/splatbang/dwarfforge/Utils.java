@@ -35,6 +35,7 @@ class Utils {
     static final short SECS = 20;
     static final short MINS = 60 * SECS;
 
+    // TODO: Is there some way to get this info from the server?
     static final Material[] COOKABLES = new Material[] {
         Material.DIAMOND_ORE,
         Material.IRON_ORE,

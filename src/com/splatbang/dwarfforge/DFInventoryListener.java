@@ -58,11 +58,12 @@ class DFInventoryListener extends InventoryListener implements DFListener {
             return;
 
         // Do nothing if the furnace isn't a Dwarf Forge.
-        final Forge forge = new Forge(event.getFurnace());
-        if (!forge.isValid())
+        Block block = event.getFurnace();
+        if (!Forge.isValid(block))
             return;
 
         // Queue up task to unload and reload the furnace.
+        final Forge forge = new Forge(block);
         main.queueTask(new Runnable() {
             public void run() {
                 forge.unloadProduct();

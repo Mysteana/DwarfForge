@@ -79,22 +79,21 @@ class Forge {
     }
 
     boolean isValid() {
+        return Forge.isValid(block);
+    }
+
+    // This static version is kept around so that other code may check if a block
+    // is potentially a Forge before actually creating a Forge object.
+    static boolean isValid(Block block) {
         // Can't be a Forge if it isn't a furnace.
         if (!Utils.isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE))
             return false;
 
         Block below = block.getRelative(BlockFace.DOWN);
 
-        // Is lava below? Then it is a Forge.
-        if (Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA))
-            return true;
-
-        // Finally, it is a Forge if another Forge is below.
-        return (new Forge(below)).isValid();
-    }
-
-    static boolean isValid(Block block) {
-        return (new Forge(block)).isValid();
+        // Is lava or another Forge below? Then it is a Forge.
+        return Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA)
+            || isValid(below);
     }
 
     boolean isBurning() {
@@ -158,7 +157,7 @@ class Forge {
         DwarfForge.saveActiveForges(active);
     }
 
-    static BlockFace getForward(Block block) {
+    private static BlockFace getForward(Block block) {
         Furnace state = (Furnace) block.getState();
         return ((FurnaceAndDispenser) state.getData()).getFacing();
     }

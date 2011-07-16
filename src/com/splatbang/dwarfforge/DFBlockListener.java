@@ -110,8 +110,8 @@ class DFBlockListener extends BlockListener implements DFListener {
             return;
 
         // Do nothing if the furnace isn't a Dwarf Forge.
-        final Forge forge = new Forge(event.getBlock());
-        if (!forge.isValid())
+        Block block = event.getBlock();
+        if (!Forge.isValid(block))
             return;
 
         // Do nothing if the player hasn't permission to use the forge.
@@ -123,6 +123,7 @@ class DFBlockListener extends BlockListener implements DFListener {
         }
 
         // Queue up task to toggle the forge.
+        final Forge forge = new Forge(event.getBlock());
         main.queueTask(new Runnable() {
             public void run() {
                 forge.toggle();
