@@ -28,6 +28,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.Event;
 import org.bukkit.event.inventory.InventoryListener;
+import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 
 
