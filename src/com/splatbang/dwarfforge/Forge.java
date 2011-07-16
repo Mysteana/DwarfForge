@@ -24,6 +24,10 @@ package com.splatbang.dwarfforge;
 
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -36,9 +40,14 @@ import org.bukkit.material.FurnaceAndDispenser;
 
 class Forge {
 
-    static final int RAW_SLOT = 0;
-    static final int FUEL_SLOT = 1;
-    static final int PRODUCT_SLOT = 2;
+    private static final int RAW_SLOT = 0;
+    private static final int FUEL_SLOT = 1;
+    private static final int PRODUCT_SLOT = 2;
+
+    private static final short ZERO_DURATION = 1;                 // Yeah, I should explain this...
+    private static final short BURN_DURATION =25 * Utils.MINS;    // This must be less than max short.
+
+    static HashSet<Location> active = new HashSet<Location>();
 
 
     static boolean isValid(Block block) {
@@ -74,7 +83,7 @@ class Forge {
             state.setData(priorState.getData());
         }
 
-        state.setBurnTime(Listener.BURN_DURATION);
+        state.setBurnTime(BURN_DURATION);
         state.update();
 
         // Anytime we (re-)ignite the furnace, we can attempt to reload
@@ -85,17 +94,21 @@ class Forge {
     static void douse(Block block) {
         // Easy way to douse a forge is simply to set a "zero" duration.
         Furnace state = (Furnace) block.getState();
-        state.setBurnTime(Listener.ZERO_DURATION);
+        state.setBurnTime(ZERO_DURATION);
         state.update();
     }
 
     static void toggle(Block block) {
         if (isBurning(block)) {
             douse(block);
+            active.remove(block.getLocation());
         }
         else {
             ignite(block);
+            active.add(block.getLocation());
         }
+
+        DwarfForge.saveActiveForges(active);
     }
 
     static void clearInventory(Furnace furnace) {
@@ -196,9 +209,42 @@ class Forge {
 
             // Did everything fit?
             if (!remains.isEmpty()) {
-                // NO. Put back what remains into the refined slot.
+                // NO. Put back what remains into the product slot.
                 blockInv.setItem(PRODUCT_SLOT, remains.get(0));
             }
+        }
+    }
+
+    static void updateAll() {
+        boolean forceSave = false;
+
+        Iterator<Location> it = active.iterator();
+        while (it.hasNext()) {
+            Block block = it.next().getBlock();
+
+            // It's possible for blocks to change such that they are no longer
+            // considered forges. (TODO: How???) Forget the remembered forge.
+            if (!isValid(block)) {
+                it.remove();
+                forceSave = true;
+
+                // TODO: What's the "right thing" to do if it's still a burning furnace?
+                // This may change once fuel support is added.
+                if (isBurning(block)) {
+                    douse(block);
+                }
+
+                // Not a forge; nothing else to do. Move along...
+                continue;
+            }
+
+            // Keep the forge burning.
+            // TODO: This will change once fuel support is added.
+            ignite(block);
+        }
+
+        if (forceSave) {
+            DwarfForge.saveActiveForges(active);
         }
     }
 

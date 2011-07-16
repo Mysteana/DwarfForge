@@ -125,7 +125,7 @@ class DFBlockListener extends BlockListener implements DFListener {
         // Queue up task to toggle the forge.
         main.queueTask(new Runnable() {
             public void run() {
-                Listener.toggleForge(block);
+                Forge.toggle(block);
             }
         });
     }

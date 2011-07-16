@@ -23,9 +23,18 @@
 package com.splatbang.dwarfforge;
 
 
+import java.io.EOFException;
+import java.io.File;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.lang.Runnable;
 import java.lang.String;
+import java.util.HashSet;
 import java.util.logging.Logger;
 
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
@@ -37,21 +46,36 @@ import org.bukkit.util.config.Configuration;
 public class DwarfForge extends JavaPlugin {
 
     private Logger log = Logger.getLogger("Minecraft");
-    private Listener listener = new Listener();
 
     DFPermissions permission = new DFPermissions();
     Configuration config = null;
 
+    private DFListener[] listeners = {
+        new DFBlockListener(),
+        new DFInventoryListener()
+    };
+
+    private static final int INVALID_TASK = -1;
+    private static final short TASK_DURATION = 1 * Utils.SECS;    // This should be less than burn duration.
+    private int task = INVALID_TASK;
+
+    private static DwarfForge main;
 
     @Override
     public void onEnable() {
+        main = this;
         config = getConfiguration();
 
+        restoreActiveForges(Forge.active);
         permission.enable(this);
-        listener.enable(this);
+        for (DFListener listener : listeners) {
+            listener.onEnable(this);
+        }
 
         // If the config file didn't exist, this will write the default back to disk.
         config.save();
+
+        startTask();
 
         PluginDescriptionFile pdf = this.getDescription();
         logInfo("Version " + pdf.getVersion() + " enabled.");
@@ -59,8 +83,13 @@ public class DwarfForge extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        listener.disable();
+        stopTask();
+
+        for (DFListener listener : listeners) {
+            listener.onDisable();
+        }
         permission.disable();
+        saveActiveForges(Forge.active);
         config = null;
 
         logInfo("Disabled.");
@@ -93,5 +122,77 @@ public class DwarfForge extends JavaPlugin {
     void registerEvent(Event.Type type, org.bukkit.event.Listener listener, Event.Priority priority) {
         getServer().getPluginManager().registerEvent(type, listener, priority, this);
     }
+
+    static void saveActiveForges(HashSet<Location> activeForges) {
+        // TODO: Clean up this stupidity.
+        main.saveActive(activeForges);
+    }
+
+    void saveActive(HashSet<Location> activeForges) {
+        File fout = new File(getDataFolder(), "active_forges");
+        try {
+            DataOutputStream out = new DataOutputStream(new FileOutputStream(fout));
+            for (Location loc : activeForges) {
+                out.writeUTF(loc.getWorld().getName());
+                out.writeDouble(loc.getX());
+                out.writeDouble(loc.getY());
+                out.writeDouble(loc.getZ());
+            }
+            out.close();
+        }
+        catch (Exception e) {
+            logSevere("Could not save active forges to file: " + e);
+        }
+    }
+
+    static void restoreActiveForges(HashSet<Location> activeForges) {
+        // TODO: Clean up this stupidity.
+        main.restoreActive(activeForges);
+    }
+
+    void restoreActive(HashSet<Location> activeForges) {
+        activeForges.clear();
+        File fin = new File(getDataFolder(), "active_forges");
+        if (fin.exists()) {
+            try {
+                DataInputStream in = new DataInputStream(new FileInputStream(fin));
+                int count = 0;
+                while (true) {
+                    try {
+                        String name = in.readUTF();
+                        double x = in.readDouble();
+                        double y = in.readDouble();
+                        double z = in.readDouble();
+                        activeForges.add(new Location(getServer().getWorld(name), x, y, z));
+                        count += 1;
+                    }
+                    catch (EOFException e) {
+                        break;
+                    }
+                }
+                in.close();
+                logInfo("Restored " + count + " active, running forges.");
+            }
+            catch (Exception e) {
+                logSevere("Something went wrong with file while restoring forges: " + e);
+            }
+        }
+    }
+
+    private void startTask() {
+        task = queueRepeatingTask(new Runnable() {
+            public void run() {
+                Forge.updateAll();
+            }
+        }, TASK_DURATION);
+    }
+
+    private void stopTask() {
+        if (task != INVALID_TASK) {
+            cancelRepeatingTask(task);
+            task = INVALID_TASK;
+        }
+    }
+
 }
 
