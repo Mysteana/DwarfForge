@@ -56,7 +56,7 @@ class Utils {
         return Arrays.binarySearch(COOKABLES, m) >= 0;
     }
 
-    static BlockFace nextFace(BlockFace dir) {
+    static BlockFace nextCardinalFace(BlockFace dir) {
         switch (dir) {
             case NORTH:   return BlockFace.EAST;
             case EAST:    return BlockFace.SOUTH;
@@ -67,8 +67,8 @@ class Utils {
         }
     }
 
-    static BlockFace prevFace(BlockFace dir) {
-        return nextFace(dir).getOppositeFace();
+    static BlockFace prevCardinalFace(BlockFace dir) {
+        return nextCardinalFace(dir).getOppositeFace();
     }
 
     static boolean isBlockOfType(Block block, Material... types) {

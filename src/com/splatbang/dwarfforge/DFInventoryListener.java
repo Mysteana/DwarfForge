@@ -58,19 +58,19 @@ class DFInventoryListener extends InventoryListener implements DFListener {
             return;
 
         // Do nothing if the furnace isn't a Dwarf Forge.
-        final Block block = event.getFurnace();
-        if (!Forge.isValid(block))
+        final Forge forge = new Forge(event.getFurnace());
+        if (!forge.isValid())
             return;
 
         // Queue up task to unload and reload the furnace.
         main.queueTask(new Runnable() {
             public void run() {
-                Forge.unloadProduct(block);
-                Forge.loadRawMaterial(block);
+                forge.unloadProduct();
+                forge.loadRawMaterial();
 
                 // setCookTime sets time elapsed, not time remaining.
                 short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * Utils.SECS);
-                ((Furnace) block.getState()).setCookTime(dt);
+                forge.setCookTime(dt);
             }
         });
     }

@@ -27,6 +27,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 
+import net.minecraft.server.BlockFurnace;
+import org.bukkit.craftbukkit.CraftWorld;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -44,83 +47,115 @@ class Forge {
     private static final int FUEL_SLOT = 1;
     private static final int PRODUCT_SLOT = 2;
 
-    private static final short ZERO_DURATION = 1;                 // Yeah, I should explain this...
-    private static final short BURN_DURATION =25 * Utils.MINS;    // This must be less than max short.
+    private static final short ZERO_DURATION = 0;
+    private static final short BURN_DURATION = 25 * Utils.MINS;   // This must be less than max short.
 
-    static HashSet<Location> active = new HashSet<Location>();
+    static HashSet<Forge> active = new HashSet<Forge>();
 
 
-    static boolean isValid(Block block) {
+    private Block block;
+    
+
+    public Forge(Block block) {
+        this.block = block;
+    }
+
+    public Forge(Location loc) {
+        this.block = loc.getBlock();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return block.equals(((Forge) obj).block);
+    }
+
+    @Override
+    public int hashCode() {
+        return block.hashCode();
+    }
+
+    Location getLocation() {
+        return block.getLocation();
+    }
+
+    boolean isValid() {
         // Can't be a Forge if it isn't a furnace.
         if (!Utils.isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE))
             return false;
 
-        // Is lava or another Forge below this one?
         Block below = block.getRelative(BlockFace.DOWN);
-        return Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA)
-            || Forge.isValid(below);
+
+        // Is lava below? Then it is a Forge.
+        if (Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA))
+            return true;
+
+        // Finally, it is a Forge if another Forge is below.
+        return (new Forge(below)).isValid();
     }
 
-    static boolean isBurning(Block block) {
+    static boolean isValid(Block block) {
+        return (new Forge(block)).isValid();
+    }
+
+    boolean isBurning() {
         return Utils.isBlockOfType(block, Material.BURNING_FURNACE);
     }
 
-    static void ignite(Block block) {
-        Furnace state = (Furnace) block.getState();
+    private void internalsSetFurnaceBurning(boolean flag) {
+        // This gets into Craftbukkit/Minecraft internalss, but it's simple and works.
+        // See net.minecraft.server.BlockFurnace.java:69-84 (approx).
+        Location loc = block.getLocation();
+        CraftWorld world = (CraftWorld) loc.getWorld();
+        BlockFurnace.a(flag, world.getHandle(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+    }
 
-        // Setting the block type causes the furnace to drop
-        // inventory. Hence, we save and restore the inventory
-        // around the type change.
-        if (!isBurning(block)) {
+    void ignite() {
+        Furnace state = (Furnace) block.getState();
+        state.setBurnTime(BURN_DURATION);
+        state.update();
+        internalsSetFurnaceBurning(true);
+
+        /*  NOTE: --- Here is the prior, inventory-juggling code. ---
+        if (!isBurning()) {
+            // Setting the block type causes the furnace to drop
+            // inventory. Hence, we save and restore the inventory
+            // around the type change.
+
             Furnace priorState = state;
-            ItemStack[] stuff = saveInventory(priorState);
-            clearInventory(priorState); // Needed to avoid duping, etc.
+            ItemStack[] stuff = priorState.getInventory().getContents();
+            priorState.getInventory().clear();      // Needed to avoid duping, etc.
 
             block.setType(Material.BURNING_FURNACE);
 
             state = (Furnace) block.getState();
-            restoreInventory(state, stuff);
+            state.getInventory().setContents(stuff);
             state.setData(priorState.getData());
         }
-
-        state.setBurnTime(BURN_DURATION);
-        state.update();
+        */
 
         // Anytime we (re-)ignite the furnace, we can attempt to reload
         // raw materials.
-        loadRawMaterial(block);
+        loadRawMaterial();
     }
-
-    static void douse(Block block) {
-        // Easy way to douse a forge is simply to set a "zero" duration.
+        
+    void douse() {
         Furnace state = (Furnace) block.getState();
         state.setBurnTime(ZERO_DURATION);
         state.update();
+        internalsSetFurnaceBurning(false);
     }
 
-    static void toggle(Block block) {
-        if (isBurning(block)) {
-            douse(block);
-            active.remove(block.getLocation());
+    void toggle() {
+        if (isBurning()) {
+            douse();
+            active.remove(this);
         }
         else {
-            ignite(block);
-            active.add(block.getLocation());
+            ignite();
+            active.add(this);
         }
 
         DwarfForge.saveActiveForges(active);
-    }
-
-    static void clearInventory(Furnace furnace) {
-        furnace.getInventory().clear();
-    }
-
-    static ItemStack[] saveInventory(Furnace furnace) {
-        return furnace.getInventory().getContents();
-    }
-
-    static void restoreInventory(Furnace furnace, ItemStack[] stuff) {
-        furnace.getInventory().setContents(stuff);
     }
 
     static BlockFace getForward(Block block) {
@@ -128,7 +163,7 @@ class Forge {
         return ((FurnaceAndDispenser) state.getData()).getFacing();
     }
 
-    static Block getForgeChest(Block block, BlockFace dir) {
+    private static Block getForgeChest(Block block, BlockFace dir) {
         // If the adjacent block is a chest, use it.
         Block adjacent = block.getRelative(dir);
         if (Utils.isBlockOfType(adjacent, Material.CHEST))
@@ -148,17 +183,17 @@ class Forge {
         return null;
     }
 
-    static Block getInputChest(Block block) {
-        // Look for a chest stage-right (i.e. "next" face);
-        return getForgeChest(block, Utils.nextFace(getForward(block)));
+    private Block getInputChest() {
+        // Look for a chest stage-right (i.e. "next" cardinal face);
+        return getForgeChest(block, Utils.nextCardinalFace(getForward(block)));
     }
 
-    static Block getOutputChest(Block block) {
-        // Look for a chest stage-left (i.e. "prev" face).
-        return getForgeChest(block, Utils.prevFace(getForward(block)));
+    private Block getOutputChest() {
+        // Look for a chest stage-left (i.e. "prev" cardinal face).
+        return getForgeChest(block, Utils.prevCardinalFace(getForward(block)));
     }
 
-    static void loadRawMaterial(Block block) {
+    void loadRawMaterial() {
         Furnace state = (Furnace) block.getState();
         Inventory blockInv = state.getInventory();
 
@@ -168,7 +203,7 @@ class Forge {
             return;
 
         // If there is no input chest, can't reload.
-        Block input = getInputChest(block);
+        Block input = getInputChest();
         if (input == null)
             return;
 
@@ -189,10 +224,10 @@ class Forge {
         }
     }
 
-    static void unloadProduct(final Block block) {
+    void unloadProduct() {
         Furnace state = (Furnace) block.getState();
 
-        Block output = getOutputChest(block);
+        Block output = getOutputChest();
         if (output != null) {
             BetterChest chest = new BetterChest( (Chest) output.getState() );
 
@@ -215,23 +250,28 @@ class Forge {
         }
     }
 
+    void setCookTime(short dt) {
+        ((Furnace) block.getState()).setCookTime(dt);
+    }
+
     static void updateAll() {
         boolean forceSave = false;
 
-        Iterator<Location> it = active.iterator();
+        Iterator<Forge> it = active.iterator();
         while (it.hasNext()) {
-            Block block = it.next().getBlock();
+            Forge forge = it.next();
 
             // It's possible for blocks to change such that they are no longer
             // considered forges. (TODO: How???) Forget the remembered forge.
-            if (!isValid(block)) {
+
+            if (!forge.isValid()) {
                 it.remove();
                 forceSave = true;
 
                 // TODO: What's the "right thing" to do if it's still a burning furnace?
                 // This may change once fuel support is added.
-                if (isBurning(block)) {
-                    douse(block);
+                if (forge.isBurning()) {
+                    forge.douse();
                 }
 
                 // Not a forge; nothing else to do. Move along...
@@ -240,7 +280,7 @@ class Forge {
 
             // Keep the forge burning.
             // TODO: This will change once fuel support is added.
-            ignite(block);
+            forge.ignite();
         }
 
         if (forceSave) {

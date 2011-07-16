@@ -45,7 +45,7 @@ import org.bukkit.util.config.Configuration;
 
 public class DwarfForge extends JavaPlugin {
 
-    private Logger log = Logger.getLogger("Minecraft");
+    static Logger log = Logger.getLogger("Minecraft");
 
     DFPermissions permission = new DFPermissions();
     Configuration config = null;
@@ -123,34 +123,38 @@ public class DwarfForge extends JavaPlugin {
         getServer().getPluginManager().registerEvent(type, listener, priority, this);
     }
 
-    static void saveActiveForges(HashSet<Location> activeForges) {
+    static void saveActiveForges(HashSet<Forge> activeForges) {
         // TODO: Clean up this stupidity.
         main.saveActive(activeForges);
     }
 
-    void saveActive(HashSet<Location> activeForges) {
+    void saveActive(HashSet<Forge> activeForges) {
         File fout = new File(getDataFolder(), "active_forges");
         try {
             DataOutputStream out = new DataOutputStream(new FileOutputStream(fout));
-            for (Location loc : activeForges) {
+            int count = 0;
+            for (Forge forge : activeForges) {
+                Location loc = forge.getLocation();
                 out.writeUTF(loc.getWorld().getName());
                 out.writeDouble(loc.getX());
                 out.writeDouble(loc.getY());
                 out.writeDouble(loc.getZ());
+                count += 1;
             }
             out.close();
+            logInfo("Saved " + count + " active Forges.");
         }
         catch (Exception e) {
             logSevere("Could not save active forges to file: " + e);
         }
     }
 
-    static void restoreActiveForges(HashSet<Location> activeForges) {
+    static void restoreActiveForges(HashSet<Forge> activeForges) {
         // TODO: Clean up this stupidity.
         main.restoreActive(activeForges);
     }
 
-    void restoreActive(HashSet<Location> activeForges) {
+    void restoreActive(HashSet<Forge> activeForges) {
         activeForges.clear();
         File fin = new File(getDataFolder(), "active_forges");
         if (fin.exists()) {
@@ -163,7 +167,8 @@ public class DwarfForge extends JavaPlugin {
                         double x = in.readDouble();
                         double y = in.readDouble();
                         double z = in.readDouble();
-                        activeForges.add(new Location(getServer().getWorld(name), x, y, z));
+                        Location loc = new Location(getServer().getWorld(name), x, y, z);
+                        activeForges.add(new Forge(loc.getBlock()));
                         count += 1;
                     }
                     catch (EOFException e) {
@@ -171,7 +176,7 @@ public class DwarfForge extends JavaPlugin {
                     }
                 }
                 in.close();
-                logInfo("Restored " + count + " active, running forges.");
+                logInfo("Restored " + count + " active Forges.");
             }
             catch (Exception e) {
                 logSevere("Something went wrong with file while restoring forges: " + e);
