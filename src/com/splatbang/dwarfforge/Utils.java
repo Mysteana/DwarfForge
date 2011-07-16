@@ -49,8 +49,30 @@ class Utils {
         Material.CACTUS,
     };
 
+    private static final Material[] TYPICAL_FUELS = new Material[] {
+        Material.COAL,
+        Material.WOOD,
+        Material.SAPLING,
+        Material.STICK,
+        Material.LOG,
+        Material.LAVA_BUCKET,
+    };
+        
+    private static final Material[] CRAFTED_FUELS = new Material[] {
+        Material.FENCE,
+        Material.WOOD_STAIRS,
+        Material.TRAP_DOOR,
+        Material.CHEST,
+        Material.LOCKED_CHEST,
+        Material.NOTE_BLOCK,
+        Material.JUKEBOX,
+        Material.BOOKSHELF,
+    };
+
     static {
         Arrays.sort(COOKABLES);
+        Arrays.sort(TYPICAL_FUELS);
+        Arrays.sort(CRAFTED_FUELS);
     }
 
     static boolean canCook(Material m) {
