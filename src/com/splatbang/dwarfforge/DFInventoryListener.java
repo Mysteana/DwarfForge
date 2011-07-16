@@ -31,7 +31,7 @@ import org.bukkit.event.inventory.InventoryListener;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 
 
-class DFInventoryListener extends InventoryListener implements DFListener {
+class DFInventoryListener extends InventoryListener implements DwarfForge.Listener {
     private DwarfForge main;
 
     private final static double DEFAULT_COOK_TIME = 9.25;

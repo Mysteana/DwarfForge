@@ -50,7 +50,12 @@ public class DwarfForge extends JavaPlugin {
     DFPermissions permission = new DFPermissions();
     Configuration config = null;
 
-    private DFListener[] listeners = {
+    interface Listener {
+        void onEnable(DwarfForge main);
+        void onDisable();
+    }
+
+    private Listener[] listeners = {
         new DFBlockListener(),
         new DFInventoryListener()
     };
@@ -68,7 +73,7 @@ public class DwarfForge extends JavaPlugin {
 
         restoreActiveForges(Forge.active);
         permission.enable(this);
-        for (DFListener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.onEnable(this);
         }
 
@@ -85,7 +90,7 @@ public class DwarfForge extends JavaPlugin {
     public void onDisable() {
         stopTask();
 
-        for (DFListener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.onDisable();
         }
         permission.disable();

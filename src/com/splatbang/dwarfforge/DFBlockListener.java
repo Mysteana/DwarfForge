@@ -38,7 +38,7 @@ import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
 
 
-class DFBlockListener extends BlockListener implements DFListener {
+class DFBlockListener extends BlockListener implements DwarfForge.Listener {
     private DwarfForge main;
 
     @Override
