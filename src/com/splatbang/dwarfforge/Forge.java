@@ -223,6 +223,41 @@ class Forge {
         }
     }
 
+    void loadFuel() {
+        Furnace state = (Furnace) block.getState();
+        Inventory blockInv = state.getInventory();
+
+        // If the fuel slot in the furnace is occupied, can't reload.
+        ItemStack fuel = blockInv.getItem(FUEL_SLOT);
+        if (fuel != null && fuel.getType() != Material.AIR) {
+            DwarfForge.log.info(" -- Can't load fuel into furnace: fuel remains. -- ");
+            return;
+        }
+
+        // If there is no input chest, can't reload.
+        Block input = getInputChest();
+        if (input == null) {
+            DwarfForge.log.info(" -- Can't load fuel into furnace: no supply. -- ");
+            return;
+        }
+
+        BetterChest chest = new BetterChest( (Chest) input.getState() );
+        Inventory chestInv = chest.getInventory();
+
+        // Find the first smeltable item in the chest.
+        ItemStack[] allItems = chestInv.getContents();
+        for (ItemStack items : allItems) {
+            if (items == null)
+                continue;
+
+            if (Utils.canBurn(items.getType())) {
+                chestInv.clear(chestInv.first(items));  // Remove from the chest.
+                blockInv.setItem(FUEL_SLOT, items);      // Add to the furnace.
+                return;
+            }
+        }
+    }
+
     void unloadProduct() {
         Furnace state = (Furnace) block.getState();
 

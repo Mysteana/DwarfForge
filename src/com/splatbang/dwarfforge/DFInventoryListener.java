@@ -85,6 +85,13 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         main.logInfo("  " + event.getFuel());
         //main.logInfo("  burning? " + event.isBurning());
         main.logInfo("  " + event.getBurnTime());
+
+        final Forge forge = new Forge(block);
+        main.queueTask(new Runnable() {
+            public void run() {
+                forge.loadFuel();
+            }
+        });
     }
 
     @Override

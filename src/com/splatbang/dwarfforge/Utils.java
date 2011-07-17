@@ -79,6 +79,10 @@ class Utils {
         return Arrays.binarySearch(COOKABLES, m) >= 0;
     }
 
+    static boolean canBurn(Material m) {
+        return (Arrays.binarySearch(TYPICAL_FUELS, m) >= 0) || (Arrays.binarySearch(CRAFTED_FUELS, m) >= 0);
+    }
+
     static BlockFace nextCardinalFace(BlockFace dir) {
         switch (dir) {
             case NORTH:   return BlockFace.EAST;
