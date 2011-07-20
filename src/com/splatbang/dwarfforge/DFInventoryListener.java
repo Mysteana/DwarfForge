@@ -37,24 +37,9 @@ import org.bukkit.inventory.ItemStack;
 class DFInventoryListener extends InventoryListener implements DwarfForge.Listener {
     private DwarfForge main;
 
-    private final static double DEFAULT_COOK_TIME = 9.25;
-    private double cookTime;    // in seconds
-
-    private final static boolean DEFAULT_REQUIRE_FUEL = false;
-    static boolean requireFuel;
-
-    private final static boolean DEFAULT_USE_CRAFTED_FUEL = false;
-    private boolean useCraftedFuel;
-
     @Override
     public void onEnable(DwarfForge main) {
         this.main = main;
-
-        // Configuration options
-        cookTime = main.config.getDouble("DwarfForge.cooking-time.default", DEFAULT_COOK_TIME);
-        useCraftedFuel = main.config.getBoolean("DwarfForge.fuel.allow-crafted-items",
-            DEFAULT_USE_CRAFTED_FUEL);
-        requireFuel = main.config.getBoolean("DwarfForge.fuel.require", DEFAULT_REQUIRE_FUEL);
 
         // Event registration
         main.registerEvent(Event.Type.FURNACE_BURN,  this, Event.Priority.Monitor);
@@ -88,7 +73,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         }
 
         // Do nothing if fuel is not required.
-        if (!requireFuel)
+        if (!DFConfig.requireFuel())
             return;
 
         // Attempt to reload the Forge's fuel slot.
@@ -118,7 +103,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
                 forge.loadRawMaterial();
 
                 // setCookTime sets time elapsed, not time remaining.
-                short dt = (short) (Math.max(DEFAULT_COOK_TIME - cookTime, 0) * Utils.SECS);
+                short dt = (short) (Math.max(DFConfig.cookTime(), 0) * Utils.SECS);
                 forge.setCookTime(dt);
             }
         });

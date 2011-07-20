@@ -31,13 +31,9 @@ import com.nijikokun.bukkit.Permissions.Permissions;
 public class DFPermissions {
 
     private PermissionHandler handler = null;
-    private boolean opsOnly = false;
 
     public void enable(DwarfForge main) {
-        opsOnly = main.config.getBoolean("Permissions.if-disabled.ops-only", false);
-        boolean permsEnable = main.config.getBoolean("Permissions.if-available.enable", true);
-
-        if (permsEnable) {
+        if (DFConfig.enablePermissions()) {
             Plugin plugin = main.getServer().getPluginManager().getPlugin("Permissions");
             if (plugin == null) {
                 main.logInfo("Permissions plugin not detected.");
@@ -55,7 +51,7 @@ public class DFPermissions {
             }
         }
         else {
-            main.logInfo("Permissions plugin disabled; ops only? " + opsOnly);
+            main.logInfo("Permissions plugin disabled; ops only? " + DFConfig.opsOnly());
         }
     }
 
@@ -73,7 +69,7 @@ public class DFPermissions {
             return handler.has(player, perm);
 
         // Otherwise, allow if not ops-only.
-        return !opsOnly;
+        return !DFConfig.opsOnly();
     }
 }
 

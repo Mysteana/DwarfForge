@@ -111,7 +111,7 @@ class Forge {
     // Returns TRUE if the furnace is lit.
     boolean ignite() {
         boolean lit = false;
-        if (DFInventoryListener.requireFuel) {
+        if (DFConfig.requireFuel()) {
             lit = loadFuel();
         }
         else {
@@ -155,7 +155,7 @@ class Forge {
 
     void toggle() {
         if (isBurning()) {
-            if (DFInventoryListener.requireFuel) {
+            if (DFConfig.requireFuel()) {
                 unloadFuel();
             }
             else {
@@ -358,7 +358,6 @@ class Forge {
         Iterator<Forge> it = active.iterator();
         while (it.hasNext()) {
             Forge forge = it.next();
-            boolean requireFuel = DFInventoryListener.requireFuel;
 
             // It's possible for blocks to change such that they are no longer
             // considered forges. (TODO: How???) Forget the remembered forge.
@@ -369,11 +368,11 @@ class Forge {
 
                 // TODO: What's the "right thing" to do if it's still a burning furnace?
                 // Don't douse it if fuel is required; it should burn out on its own.
-                if (!requireFuel && forge.isBurning()) {
+                if (!DFConfig.requireFuel() && forge.isBurning()) {
                     forge.douse();
                 }
             }
-            else if (requireFuel) {
+            else if (DFConfig.requireFuel()) {
                 // Remove from active list if no longer burning (ie., ran out of fuel).
                 if (!forge.isBurning()) {
                     it.remove();

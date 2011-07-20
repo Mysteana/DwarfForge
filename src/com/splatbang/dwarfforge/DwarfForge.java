@@ -40,7 +40,6 @@ import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.config.Configuration;
 
 
 public class DwarfForge extends JavaPlugin {
@@ -48,7 +47,6 @@ public class DwarfForge extends JavaPlugin {
     static Logger log = Logger.getLogger("Minecraft");
 
     DFPermissions permission = new DFPermissions();
-    Configuration config = null;
 
     interface Listener {
         void onEnable(DwarfForge main);
@@ -69,16 +67,14 @@ public class DwarfForge extends JavaPlugin {
     @Override
     public void onEnable() {
         main = this;
-        config = getConfiguration();
+
+        DFConfig.onEnable(getConfiguration());
 
         restoreActiveForges(Forge.active);
         permission.enable(this);
         for (Listener listener : listeners) {
             listener.onEnable(this);
         }
-
-        // If the config file didn't exist, this will write the default back to disk.
-        config.save();
 
         startTask();
 
@@ -95,7 +91,8 @@ public class DwarfForge extends JavaPlugin {
         }
         permission.disable();
         saveActiveForges(Forge.active);
-        config = null;
+
+        DFConfig.onDisable();
 
         logInfo("Disabled.");
     }
