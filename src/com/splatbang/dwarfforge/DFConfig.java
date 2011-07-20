@@ -41,6 +41,14 @@ class DFConfig {
     private final static boolean DEFAULT_ALLOW_CRAFTED_FUEL = false;
     private static boolean allowCraftedFuel;
 
+    private final static String KEY_MAX_STACK_HORIZONTAL = "DwarfForge.stack-limit.horizontal";
+    private final static int DEFAULT_MAX_STACK_HORIZONTAL = 4;
+    private static int maxStackHorizontal;
+
+    private final static String KEY_MAX_STACK_VERTICAL = "DwarfForge.stack-limit.vertical";
+    private final static int DEFAULT_MAX_STACK_VERTICAL = 3;
+    private static int maxStackVertical;
+
     private final static String KEY_PERMISSIONS_ENABLE = "Permissions.if-available.enable";
     private final static boolean DEFAULT_PERMISSIONS_ENABLE = false;
     private static boolean enablePermissions;
@@ -55,6 +63,8 @@ class DFConfig {
 
         opsOnly = config.getBoolean(KEY_NOPERMS_OPS_ONLY, DEFAULT_NOPERMS_OPS_ONLY);
         enablePermissions = config.getBoolean(KEY_PERMISSIONS_ENABLE, DEFAULT_PERMISSIONS_ENABLE);
+        maxStackVertical = config.getInt(KEY_MAX_STACK_VERTICAL, DEFAULT_MAX_STACK_VERTICAL);
+        maxStackHorizontal = config.getInt(KEY_MAX_STACK_HORIZONTAL, DEFAULT_MAX_STACK_HORIZONTAL);
         allowCraftedFuel = config.getBoolean(KEY_ALLOW_CRAFTED_FUEL, DEFAULT_ALLOW_CRAFTED_FUEL);
         requireFuel = config.getBoolean(KEY_REQUIRE_FUEL, DEFAULT_REQUIRE_FUEL);
         cookTime = config.getDouble(KEY_COOK_TIME, DEFAULT_COOK_TIME);
@@ -78,6 +88,14 @@ class DFConfig {
 
     static boolean requireFuel() {
         return requireFuel;
+    }
+
+    static int maxStackHorizontal() {
+        return maxStackHorizontal;
+    }
+
+    static int maxStackVertical() {
+        return maxStackVertical;
     }
 
     static boolean enablePermissions() {

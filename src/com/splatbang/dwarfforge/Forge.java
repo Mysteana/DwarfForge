@@ -82,18 +82,27 @@ class Forge {
         return Forge.isValid(block);
     }
 
+    static boolean isValid(Block block) {
+        return isValid(block, 1);
+    }
+
     // This static version is kept around so that other code may check if a block
     // is potentially a Forge before actually creating a Forge object.
-    static boolean isValid(Block block) {
+    static boolean isValid(Block block, int stack) {
         // Can't be a Forge if it isn't a furnace.
         if (!Utils.isBlockOfType(block, Material.FURNACE, Material.BURNING_FURNACE))
+            return false;
+
+        // Can't be a Forge beyond the vertical stacking limit.
+        int limit = DFConfig.maxStackVertical();
+        if (0 < limit && limit < stack)
             return false;
 
         Block below = block.getRelative(BlockFace.DOWN);
 
         // Is lava or another Forge below? Then it is a Forge.
         return Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA)
-            || isValid(below);
+            || isValid(below, stack+1);
     }
 
     boolean isBurning() {
@@ -178,6 +187,15 @@ class Forge {
     }
 
     private static Block getForgeChest(Block block, BlockFace dir) {
+        return getForgeChest(block, dir, 1);
+    }
+
+    private static Block getForgeChest(Block block, BlockFace dir, int stack) {
+        // Can't use the chest beyond horizontal stacking limit.
+        int limit = DFConfig.maxStackHorizontal();
+        if (0 < limit && limit < stack)
+            return null;
+
         // If the adjacent block is a chest, use it.
         Block adjacent = block.getRelative(dir);
         if (Utils.isBlockOfType(adjacent, Material.CHEST))
@@ -186,12 +204,12 @@ class Forge {
         // If there is a forge below, use its chest.
         Block below = block.getRelative(BlockFace.DOWN);
         if (Forge.isValid(below))
-            return getForgeChest(below, dir);
+            return getForgeChest(below, dir, stack);    // Don't increase stack limit going down.
 
         // If there is a forge adjacent (in provided direction) and it
         // has a chest, use it.
         if (Forge.isValid(adjacent))
-            return getForgeChest(adjacent, dir);
+            return getForgeChest(adjacent, dir, stack+1);
 
         // No chest.
         return null;
@@ -300,11 +318,13 @@ class Forge {
             block.getWorld().dropItemNaturally(block.getLocation(), fuel);
     }
 
+    // Move the item stack to the input/output chest as provided, either returning
+    // what remains or dropping it based on flag. Note: chest might be null.
+    private ItemStack addTo(ItemStack item, Block chest, boolean dropRemains) {
+        if (item == null)   // This should NOT be the case, but haven't verified just yet.
+            return null;
 
-    ItemStack addToOutput(ItemStack item, boolean dropRemains) {
-        Block output = getOutputChest();
-        if (output == null) {
-            // No output chest.
+        if (chest == null) {    // No destination chest.
             if (dropRemains) {
                 block.getWorld().dropItemNaturally(block.getLocation(), item);
                 return null;
@@ -314,12 +334,16 @@ class Forge {
             }
         }
         else {
-            BetterChest chest = new BetterChest( (Chest) output.getState() );
-            Inventory chestInv = chest.getInventory();
+            BetterChest bchest = new BetterChest( (Chest) chest.getState() );
+            Inventory chestInv = bchest.getInventory();
 
             HashMap<Integer, ItemStack> remains = chestInv.addItem(item);
-            if (!remains.isEmpty()) {
-                // Output chest full.
+            if (remains.isEmpty()) {
+                // Everything fit!
+                return null;
+            }
+            else {
+                // Destination chest full.
                 if (dropRemains) {
                     block.getWorld().dropItemNaturally(block.getLocation(), remains.get(0));
                     return null;
@@ -329,7 +353,10 @@ class Forge {
                 }
             }
         }
-        return null;
+    }
+
+    ItemStack addToOutput(ItemStack item, boolean dropRemains) {
+        return addTo(item, getOutputChest(), dropRemains);
     }
 
     void unloadProduct() {
@@ -339,7 +366,17 @@ class Forge {
         ItemStack item = blockInv.getItem(PRODUCT_SLOT);
         if (item != null) {
             blockInv.clear(PRODUCT_SLOT);
-            ItemStack remains = addToOutput(item, false);
+
+            // Special test: if charcoal is product and fuel is required, put it back into input chest.
+            Block dest;
+            if (DFConfig.requireFuel() && item.getType() == Material.COAL) {
+                dest = getInputChest();
+            }
+            else {
+                dest = getOutputChest();    // all other products go to output chest
+            }
+
+            ItemStack remains = addTo(item, dest, false);
             
             if (remains != null) {
                 // Put what remains back into product slot.
