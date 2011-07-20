@@ -24,12 +24,14 @@ package com.splatbang.dwarfforge;
 
 
 import java.lang.Runnable;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.Event;
-import org.bukkit.event.inventory.InventoryListener;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
+import org.bukkit.event.inventory.InventoryListener;
+import org.bukkit.inventory.ItemStack;
 
 
 class DFInventoryListener extends InventoryListener implements DwarfForge.Listener {
@@ -72,17 +74,24 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         if (event.isCancelled())
             return;
 
-        // Do nothing if fuel is not required.
-        if (!requireFuel)
-            return;
-
         // Do nothing if the furnace isn't a Dwarf Forge.
         Block block = event.getFurnace();
         if (!Forge.isValid(block))
             return;
 
-        // Attempt to reload the Forge's fuel slot.
         final Forge forge = new Forge(block);
+
+        // If it was a lava bucket that was burned, place an empty
+        // bucket into the output chest (or drop to ground).
+        if (event.getFuel().getType() == Material.LAVA_BUCKET) {
+            forge.addToOutput(new ItemStack(Material.BUCKET, 1), true);
+        }
+
+        // Do nothing if fuel is not required.
+        if (!requireFuel)
+            return;
+
+        // Attempt to reload the Forge's fuel slot.
         main.queueTask(new Runnable() {
             public void run() {
                 forge.loadFuel();

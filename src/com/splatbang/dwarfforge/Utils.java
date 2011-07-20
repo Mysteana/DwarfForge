@@ -32,7 +32,7 @@ import org.bukkit.block.BlockFace;
 
 class Utils {
 
-    static final short SECS = 20;
+    static final short SECS = 20;   // 20 ticks
     static final short MINS = 60 * SECS;
 
     // TODO: Is there some way to get this info from the server?
@@ -49,12 +49,13 @@ class Utils {
         Material.CACTUS,
     };
 
+    // LOGs could normally be used as fuel, but the Dwarfs were not stupid.
+    // Let the LOGs cook into charcoal, which is a much more efficient fuel.
     private static final Material[] TYPICAL_FUELS = new Material[] {
         Material.COAL,
         Material.WOOD,
         Material.SAPLING,
         Material.STICK,
-        Material.LOG,
         Material.LAVA_BUCKET,
     };
         

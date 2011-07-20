@@ -301,28 +301,49 @@ class Forge {
     }
 
 
-    void unloadProduct() {
-        Furnace state = (Furnace) block.getState();
-
+    ItemStack addToOutput(ItemStack item, boolean dropRemains) {
         Block output = getOutputChest();
-        if (output != null) {
+        if (output == null) {
+            // No output chest.
+            if (dropRemains) {
+                block.getWorld().dropItemNaturally(block.getLocation(), item);
+                return null;
+            }
+            else {
+                return item;
+            }
+        }
+        else {
             BetterChest chest = new BetterChest( (Chest) output.getState() );
-
-            Inventory blockInv = state.getInventory();
             Inventory chestInv = chest.getInventory();
 
-            ItemStack item = blockInv.getItem(PRODUCT_SLOT);
-
-            // Remove the item from the furnace.
-            blockInv.clear(PRODUCT_SLOT);
-
-            // Add the smelted item to the chest.
-            HashMap<Integer,ItemStack> remains = chestInv.addItem(item);
-
-            // Did everything fit?
+            HashMap<Integer, ItemStack> remains = chestInv.addItem(item);
             if (!remains.isEmpty()) {
-                // NO. Put back what remains into the product slot.
-                blockInv.setItem(PRODUCT_SLOT, remains.get(0));
+                // Output chest full.
+                if (dropRemains) {
+                    block.getWorld().dropItemNaturally(block.getLocation(), remains.get(0));
+                    return null;
+                }
+                else {
+                    return remains.get(0);
+                }
+            }
+        }
+        return null;
+    }
+
+    void unloadProduct() {
+        Furnace state = (Furnace) block.getState();
+        Inventory blockInv = state.getInventory();
+
+        ItemStack item = blockInv.getItem(PRODUCT_SLOT);
+        if (item != null) {
+            blockInv.clear(PRODUCT_SLOT);
+            ItemStack remains = addToOutput(item, false);
+            
+            if (remains != null) {
+                // Put what remains back into product slot.
+                blockInv.setItem(PRODUCT_SLOT, remains);
             }
         }
     }
