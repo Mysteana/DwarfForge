@@ -108,11 +108,19 @@ class Forge {
         BlockFurnace.a(flag, world.getHandle(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
     }
 
-    void ignite() {
-        Furnace state = (Furnace) block.getState();
-        state.setBurnTime(BURN_DURATION);
-        state.update();
-        internalsSetFurnaceBurning(true);
+    // Returns TRUE if the furnace is lit.
+    boolean ignite() {
+        boolean lit = false;
+        if (DFInventoryListener.requireFuel) {
+            lit = loadFuel();
+        }
+        else {
+            Furnace state = (Furnace) block.getState();
+            state.setBurnTime(BURN_DURATION);
+            state.update();
+            internalsSetFurnaceBurning(true);
+            lit = true;
+        }
 
         /*  NOTE: --- Here is the prior, inventory-juggling code. ---
         if (!isBurning()) {
@@ -135,6 +143,7 @@ class Forge {
         // Anytime we (re-)ignite the furnace, we can attempt to reload
         // raw materials.
         loadRawMaterial();
+        return lit;
     }
         
     void douse() {
@@ -146,12 +155,18 @@ class Forge {
 
     void toggle() {
         if (isBurning()) {
-            douse();
+            if (DFInventoryListener.requireFuel) {
+                unloadFuel();
+            }
+            else {
+                douse();
+            }
             active.remove(this);
         }
         else {
-            ignite();
-            active.add(this);
+            if (ignite()) {
+                active.add(this);
+            }
         }
 
         DwarfForge.saveActiveForges(active);
@@ -223,28 +238,25 @@ class Forge {
         }
     }
 
-    void loadFuel() {
+    // Returns true if fuel is in the fuel slot (not necessarily if it was just loaded).
+    boolean loadFuel() {
         Furnace state = (Furnace) block.getState();
         Inventory blockInv = state.getInventory();
 
         // If the fuel slot in the furnace is occupied, can't reload.
         ItemStack fuel = blockInv.getItem(FUEL_SLOT);
-        if (fuel != null && fuel.getType() != Material.AIR) {
-            DwarfForge.log.info(" -- Can't load fuel into furnace: fuel remains. -- ");
-            return;
-        }
+        if (fuel != null && fuel.getType() != Material.AIR)
+            return true;    // We didn't load, but there IS fuel there.
 
         // If there is no input chest, can't reload.
         Block input = getInputChest();
-        if (input == null) {
-            DwarfForge.log.info(" -- Can't load fuel into furnace: no supply. -- ");
-            return;
-        }
+        if (input == null)
+            return false;
 
         BetterChest chest = new BetterChest( (Chest) input.getState() );
         Inventory chestInv = chest.getInventory();
 
-        // Find the first smeltable item in the chest.
+        // Find the first burnable item in the chest.
         ItemStack[] allItems = chestInv.getContents();
         for (ItemStack items : allItems) {
             if (items == null)
@@ -252,11 +264,42 @@ class Forge {
 
             if (Utils.canBurn(items.getType())) {
                 chestInv.clear(chestInv.first(items));  // Remove from the chest.
-                blockInv.setItem(FUEL_SLOT, items);      // Add to the furnace.
-                return;
+                blockInv.setItem(FUEL_SLOT, items);     // Add to the furnace.
+                return true;
             }
         }
+
+        return false;
     }
+
+    // This may get called if fuel is required and the operator toggles the forge off.
+    void unloadFuel() {
+        Furnace state = (Furnace) block.getState();
+        Inventory blockInv = state.getInventory();
+
+        // Remove fuel from the furnace.
+        ItemStack fuel = blockInv.getItem(FUEL_SLOT);
+        if (fuel == null || fuel.getType() == Material.AIR)
+            return;     // No fuel? WTF? Whatever...
+
+        blockInv.clear(FUEL_SLOT);
+
+        // First, try putting as much fuel back into the input chest.
+        Block input = getInputChest();
+        if (input != null) {
+            BetterChest chest = new BetterChest( (Chest) input.getState() );
+            Inventory chestInv = chest.getInventory();
+
+            // Add to chest; remember what remains, if any.
+            HashMap<Integer,ItemStack> remains = chestInv.addItem(fuel);
+            fuel = remains.isEmpty() ? null : remains.get(0);
+        }
+
+        // Second, drop on ground.
+        if (fuel != null)
+            block.getWorld().dropItemNaturally(block.getLocation(), fuel);
+    }
+
 
     void unloadProduct() {
         Furnace state = (Furnace) block.getState();
@@ -294,6 +337,7 @@ class Forge {
         Iterator<Forge> it = active.iterator();
         while (it.hasNext()) {
             Forge forge = it.next();
+            boolean requireFuel = DFInventoryListener.requireFuel;
 
             // It's possible for blocks to change such that they are no longer
             // considered forges. (TODO: How???) Forget the remembered forge.
@@ -303,18 +347,22 @@ class Forge {
                 forceSave = true;
 
                 // TODO: What's the "right thing" to do if it's still a burning furnace?
-                // This may change once fuel support is added.
-                if (forge.isBurning()) {
+                // Don't douse it if fuel is required; it should burn out on its own.
+                if (!requireFuel && forge.isBurning()) {
                     forge.douse();
                 }
-
-                // Not a forge; nothing else to do. Move along...
-                continue;
             }
-
-            // Keep the forge burning.
-            // TODO: This will change once fuel support is added.
-            forge.ignite();
+            else if (requireFuel) {
+                // Remove from active list if no longer burning (ie., ran out of fuel).
+                if (!forge.isBurning()) {
+                    it.remove();
+                    forceSave = true;
+                }
+            }
+            else {
+                // Still a forge, without need for fuel; keep it burning.
+                forge.ignite();
+            }
         }
 
         if (forceSave) {

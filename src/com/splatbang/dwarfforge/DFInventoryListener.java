@@ -39,7 +39,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
     private double cookTime;    // in seconds
 
     private final static boolean DEFAULT_REQUIRE_FUEL = false;
-    private boolean requireFuel;
+    static boolean requireFuel;
 
     private final static boolean DEFAULT_USE_CRAFTED_FUEL = false;
     private boolean useCraftedFuel;
@@ -81,11 +81,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         if (!Forge.isValid(block))
             return;
 
-        main.logInfo("Fuel burn event: ");
-        main.logInfo("  " + event.getFuel());
-        //main.logInfo("  burning? " + event.isBurning());
-        main.logInfo("  " + event.getBurnTime());
-
+        // Attempt to reload the Forge's fuel slot.
         final Forge forge = new Forge(block);
         main.queueTask(new Runnable() {
             public void run() {
