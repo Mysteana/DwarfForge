@@ -31,6 +31,7 @@ import org.bukkit.event.Event;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.event.inventory.InventoryListener;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 
@@ -59,29 +60,61 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         if (event.isCancelled())
             return;
 
-        // Do nothing if the furnace isn't a Dwarf Forge.
-        Block block = event.getFurnace();
-        if (!Forge.isValid(block))
-            return;
+        final Block block = event.getFurnace();
+        final Forge forge = Forge.isValid(block) ? new Forge(block) : null;
 
-        final Forge forge = new Forge(block);
-
-        // If it was a lava bucket that was burned, place an empty
-        // bucket into the output chest (or drop to ground).
+        // If it was a lava bucket that was used, preserve an empty bucket
+        // whether it was a Dwarf Forge or not.
         if (event.getFuel().getType() == Material.LAVA_BUCKET) {
-            forge.addToOutput(new ItemStack(Material.BUCKET, 1), true);
+            final ItemStack bucket = new ItemStack(Material.BUCKET, 1);
+
+            main.queueTask(new Runnable() {
+                public void run() {
+                    ItemStack item = bucket;
+
+                    if (forge != null) {    // It is a Dwarf Forge.
+                        Block inputChest = forge.getInputChest();
+                        Block outputChest = forge.getOutputChest();
+
+                        // First try putting the bucket in the output chest.
+                        if (item != null && outputChest != null) {
+                            item = forge.addTo(item, outputChest, false);
+                        }
+
+                        // Next try putting the bucket in the input chest.
+                        if (item != null && inputChest != null) {
+                            item = forge.addTo(item, inputChest, false);
+                        }
+                    }
+
+                    if (item != null) {
+                        Inventory inv = ((Furnace) block.getState()).getInventory();
+                        ItemStack curr = inv.getItem(Forge.FUEL_SLOT);
+                        if (curr == null || curr.getType() == Material.AIR) {   // Is fuel slot empty?
+                            // Yes, place it in the fuel slot.
+                            inv.setItem(Forge.FUEL_SLOT, item);
+                        }
+                        else {
+                            // Not empty; no place left to put the bucket. Drop it to the ground.
+                            block.getWorld().dropItemNaturally(block.getLocation(), item);
+                        }
+                    }
+                }
+            });
         }
 
-        // Do nothing if fuel is not required.
-        if (!DFConfig.requireFuel())
+        // Do nothing else if the furnace isn't a Dwarf Forge.
+        if (forge == null)
             return;
 
-        // Attempt to reload the Forge's fuel slot.
-        main.queueTask(new Runnable() {
-            public void run() {
-                forge.loadFuel();
-            }
-        });
+        // Reload fuel if required.
+        if (DFConfig.requireFuel()) {
+            main.queueTask(new Runnable() {
+                public void run() {
+                    forge.loadFuel();
+                }
+            });
+        }
     }
 
     @Override

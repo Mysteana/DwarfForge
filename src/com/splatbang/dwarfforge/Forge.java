@@ -43,12 +43,12 @@ import org.bukkit.material.FurnaceAndDispenser;
 
 class Forge {
 
-    private static final int RAW_SLOT = 0;
-    private static final int FUEL_SLOT = 1;
-    private static final int PRODUCT_SLOT = 2;
+    static final int RAW_SLOT = 0;
+    static final int FUEL_SLOT = 1;
+    static final int PRODUCT_SLOT = 2;
 
-    private static final short ZERO_DURATION = 0;
-    private static final short BURN_DURATION = 25 * Utils.MINS;   // This must be less than max short.
+    static final short ZERO_DURATION = 0;
+    static final short BURN_DURATION = 25 * Utils.MINS;   // This must be less than max short.
 
     static HashSet<Forge> active = new HashSet<Forge>();
 
@@ -109,6 +109,10 @@ class Forge {
         return Utils.isBlockOfType(block, Material.BURNING_FURNACE);
     }
 
+    boolean isActive() {
+        return active.contains(this);
+    }
+
     private void internalsSetFurnaceBurning(boolean flag) {
         // This gets into Craftbukkit/Minecraft internalss, but it's simple and works.
         // See net.minecraft.server.BlockFurnace.java:69-84 (approx).
@@ -131,24 +135,6 @@ class Forge {
             lit = true;
         }
 
-        /*  NOTE: --- Here is the prior, inventory-juggling code. ---
-        if (!isBurning()) {
-            // Setting the block type causes the furnace to drop
-            // inventory. Hence, we save and restore the inventory
-            // around the type change.
-
-            Furnace priorState = state;
-            ItemStack[] stuff = priorState.getInventory().getContents();
-            priorState.getInventory().clear();      // Needed to avoid duping, etc.
-
-            block.setType(Material.BURNING_FURNACE);
-
-            state = (Furnace) block.getState();
-            state.getInventory().setContents(stuff);
-            state.setData(priorState.getData());
-        }
-        */
-
         // Anytime we (re-)ignite the furnace, we can attempt to reload
         // raw materials.
         loadRawMaterial();
@@ -163,7 +149,7 @@ class Forge {
     }
 
     void toggle() {
-        if (isBurning()) {
+        if (isActive()) {
             if (DFConfig.requireFuel()) {
                 unloadFuel();
             }
@@ -177,7 +163,7 @@ class Forge {
                 active.add(this);
             }
         }
-
+            
         DwarfForge.saveActiveForges(active);
     }
 
@@ -215,12 +201,12 @@ class Forge {
         return null;
     }
 
-    private Block getInputChest() {
+    Block getInputChest() {
         // Look for a chest stage-right (i.e. "next" cardinal face);
         return getForgeChest(block, Utils.nextCardinalFace(getForward(block)));
     }
 
-    private Block getOutputChest() {
+    Block getOutputChest() {
         // Look for a chest stage-left (i.e. "prev" cardinal face).
         return getForgeChest(block, Utils.prevCardinalFace(getForward(block)));
     }
@@ -320,7 +306,7 @@ class Forge {
 
     // Move the item stack to the input/output chest as provided, either returning
     // what remains or dropping it based on flag. Note: chest might be null.
-    private ItemStack addTo(ItemStack item, Block chest, boolean dropRemains) {
+    ItemStack addTo(ItemStack item, Block chest, boolean dropRemains) {
         if (item == null)   // This should NOT be the case, but haven't verified just yet.
             return null;
 
