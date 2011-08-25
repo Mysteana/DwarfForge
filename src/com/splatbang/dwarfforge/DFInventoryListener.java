@@ -61,7 +61,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
             return;
 
         final Block block = event.getFurnace();
-        final Forge forge = Forge.isValid(block) ? new Forge(block) : null;
+        final Forge forge = Forge.find(block);
 
         // If it was a lava bucket that was used, preserve an empty bucket
         // whether it was a Dwarf Forge or not.
@@ -110,9 +110,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         // Reload fuel if required.
         if (DFConfig.requireFuel()) {
             main.queueTask(new Runnable() {
-                public void run() {
-                    forge.loadFuel();
-                }
+                public void run() { forge.update(); }
             });
         }
     }
@@ -129,16 +127,9 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
             return;
 
         // Queue up task to unload and reload the furnace.
-        final Forge forge = new Forge(block);
+        final Forge forge = Forge.find(block);
         main.queueTask(new Runnable() {
-            public void run() {
-                forge.unloadProduct();
-                forge.loadRawMaterial();
-
-                // setCookTime sets time elapsed, not time remaining.
-                short dt = (short) (Math.max(DFConfig.cookTime(), 0) * Utils.SECS);
-                forge.setCookTime(dt);
-            }
+            public void run() { forge.update(); }
         });
     }
 }

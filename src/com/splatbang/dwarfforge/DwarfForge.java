@@ -31,7 +31,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.lang.Runnable;
 import java.lang.String;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 import org.bukkit.Location;
@@ -58,11 +58,7 @@ public class DwarfForge extends JavaPlugin {
         new DFInventoryListener()
     };
 
-    private static final int INVALID_TASK = -1;
-    private static final short TASK_DURATION = 1 * Utils.SECS;    // This should be less than burn duration.
-    private int task = INVALID_TASK;
-
-    private static DwarfForge main;
+    static DwarfForge main;
 
     @Override
     public void onEnable() {
@@ -76,16 +72,12 @@ public class DwarfForge extends JavaPlugin {
             listener.onEnable(this);
         }
 
-        startTask();
-
         PluginDescriptionFile pdf = this.getDescription();
         logInfo("Version " + pdf.getVersion() + " enabled.");
     }
 
     @Override
     public void onDisable() {
-        stopTask();
-
         for (Listener listener : listeners) {
             listener.onDisable();
         }
@@ -93,6 +85,7 @@ public class DwarfForge extends JavaPlugin {
         saveActiveForges(Forge.active);
 
         DFConfig.onDisable();
+        main = null;
 
         logInfo("Disabled.");
     }
@@ -109,15 +102,15 @@ public class DwarfForge extends JavaPlugin {
         return getServer().getScheduler().scheduleSyncDelayedTask(this, task);
     }
 
-    int queueDelayedTask(Runnable task, long delay) {
+    int queueDelayedTask(long delay, Runnable task) {
         return getServer().getScheduler().scheduleSyncDelayedTask(this, task, delay);
     }
 
-    int queueRepeatingTask(Runnable task, short interval) {
-        return getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 0, interval);
+    int queueRepeatingTask(long delay, long period, Runnable task) {
+        return getServer().getScheduler().scheduleSyncRepeatingTask(this, task, delay, period);
     }
 
-    void cancelRepeatingTask(int id) {
+    void cancelTask(int id) {
         getServer().getScheduler().cancelTask(id);
     }
 
@@ -125,17 +118,17 @@ public class DwarfForge extends JavaPlugin {
         getServer().getPluginManager().registerEvent(type, listener, priority, this);
     }
 
-    static void saveActiveForges(HashSet<Forge> activeForges) {
+    static void saveActiveForges(HashMap<Location, Forge> activeForges) {
         // TODO: Clean up this stupidity.
         main.saveActive(activeForges);
     }
 
-    void saveActive(HashSet<Forge> activeForges) {
+    void saveActive(HashMap<Location, Forge> activeForges) {
         File fout = new File(getDataFolder(), "active_forges");
         try {
             DataOutputStream out = new DataOutputStream(new FileOutputStream(fout));
             int count = 0;
-            for (Forge forge : activeForges) {
+            for (Forge forge : activeForges.values()) {
                 Location loc = forge.getLocation();
                 out.writeUTF(loc.getWorld().getName());
                 out.writeDouble(loc.getX());
@@ -151,12 +144,12 @@ public class DwarfForge extends JavaPlugin {
         }
     }
 
-    static void restoreActiveForges(HashSet<Forge> activeForges) {
+    static void restoreActiveForges(HashMap<Location, Forge> activeForges) {
         // TODO: Clean up this stupidity.
         main.restoreActive(activeForges);
     }
 
-    void restoreActive(HashSet<Forge> activeForges) {
+    void restoreActive(HashMap<Location, Forge> activeForges) {
         activeForges.clear();
         File fin = new File(getDataFolder(), "active_forges");
         if (fin.exists()) {
@@ -170,7 +163,7 @@ public class DwarfForge extends JavaPlugin {
                         double y = in.readDouble();
                         double z = in.readDouble();
                         Location loc = new Location(getServer().getWorld(name), x, y, z);
-                        activeForges.add(new Forge(loc.getBlock()));
+                        activeForges.put(loc, new Forge(loc));
                         count += 1;
                     }
                     catch (EOFException e) {
@@ -183,21 +176,6 @@ public class DwarfForge extends JavaPlugin {
             catch (Exception e) {
                 logSevere("Something went wrong with file while restoring forges: " + e);
             }
-        }
-    }
-
-    private void startTask() {
-        task = queueRepeatingTask(new Runnable() {
-            public void run() {
-                Forge.updateAll();
-            }
-        }, TASK_DURATION);
-    }
-
-    private void stopTask() {
-        if (task != INVALID_TASK) {
-            cancelRepeatingTask(task);
-            task = INVALID_TASK;
         }
     }
 

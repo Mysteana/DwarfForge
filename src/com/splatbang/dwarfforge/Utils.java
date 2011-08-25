@@ -29,59 +29,62 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 
+import net.minecraft.server.FurnaceRecipes;
+import net.minecraft.server.ItemStack;
+import org.bukkit.craftbukkit.inventory.CraftItemStack;
+
 
 class Utils {
 
-    static final short SECS = 20;   // 20 ticks
+    static final short SECS = 20;           // 20 server ticks
     static final short MINS = 60 * SECS;
 
-    // TODO: Is there some way to get this info from the server?
-    static final Material[] COOKABLES = new Material[] {
-        Material.DIAMOND_ORE,
-        Material.IRON_ORE,
-        Material.GOLD_ORE,
-        Material.SAND,
-        Material.COBBLESTONE,
-        Material.CLAY_BALL,
-        Material.PORK,
-        Material.RAW_FISH,
-        Material.LOG,
-        Material.CACTUS,
-    };
-
-    // LOGs could normally be used as fuel, but the Dwarfs were not stupid.
-    // Let the LOGs cook into charcoal, which is a much more efficient fuel.
-    private static final Material[] TYPICAL_FUELS = new Material[] {
-        Material.COAL,
-        Material.WOOD,
-        Material.SAPLING,
-        Material.STICK,
-        Material.LAVA_BUCKET,
-    };
+    // Logs are usually considered a typical fuel, but the Dwarfs were not
+    // stupid. Cook logs into charcoal, a much more efficient fuel.
+    static private boolean isTypicalFuel(Material m) {
+        switch (m) {
+            case COAL:
+            case WOOD:
+            case SAPLING:
+            case STICK:
+            case LAVA_BUCKET:
+                return true;
+            default:
+                return false;
+        }
+    }
         
-    private static final Material[] CRAFTED_FUELS = new Material[] {
-        Material.FENCE,
-        Material.WOOD_STAIRS,
-        Material.TRAP_DOOR,
-        Material.CHEST,
-        Material.LOCKED_CHEST,
-        Material.NOTE_BLOCK,
-        Material.JUKEBOX,
-        Material.BOOKSHELF,
-    };
+    static private boolean isCraftedFuel(Material m) {
+        switch (m) {
+            case FENCE:
+            case WOOD_STAIRS:
+            case TRAP_DOOR:
+            case CHEST:
+            case LOCKED_CHEST:
+            case NOTE_BLOCK:
+            case JUKEBOX:
+            case BOOKSHELF:
+                return true;
+            default:
+                return false;
+        }
+    }
 
-    static {
-        Arrays.sort(COOKABLES);
-        Arrays.sort(TYPICAL_FUELS);
-        Arrays.sort(CRAFTED_FUELS);
+    static Material resultOfCooking(Material mat) {
+        ItemStack item = FurnaceRecipes.getInstance().a(mat.getId());
+        return (item != null)
+                ? new CraftItemStack(item).getType()
+                : null;
     }
 
     static boolean canCook(Material m) {
-        return Arrays.binarySearch(COOKABLES, m) >= 0;
+        return resultOfCooking(m) != null;
     }
 
     static boolean canBurn(Material m) {
-        return (Arrays.binarySearch(TYPICAL_FUELS, m) >= 0) || (Arrays.binarySearch(CRAFTED_FUELS, m) >= 0);
+        return isTypicalFuel(m)
+        //  || isCraftedFuel(m)     // TODO allowCraftedFuel
+            ;
     }
 
     static BlockFace nextCardinalFace(BlockFace dir) {
@@ -91,7 +94,8 @@ class Utils {
             case SOUTH:   return BlockFace.WEST;
             case WEST:    return BlockFace.NORTH;
             default:
-                throw new IllegalArgumentException("Only cardinal directions permitted: received " + dir);
+                throw new IllegalArgumentException(
+                        "Only cardinal directions permitted: received " + dir);
         }
     }
 

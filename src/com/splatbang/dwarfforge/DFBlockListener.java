@@ -123,7 +123,7 @@ class DFBlockListener extends BlockListener implements DwarfForge.Listener {
         }
 
         // Queue up task to toggle the forge.
-        final Forge forge = new Forge(event.getBlock());
+        final Forge forge = Forge.find(block);
         main.queueTask(new Runnable() {
             public void run() {
                 forge.toggle();

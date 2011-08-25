@@ -23,8 +23,8 @@
 package com.splatbang.dwarfforge;
 
 
+import java.lang.Runnable;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 
 import net.minecraft.server.BlockFurnace;
@@ -41,49 +41,67 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.FurnaceAndDispenser;
 
 
-class Forge {
+class Forge implements Runnable {
 
     static final int RAW_SLOT = 0;
     static final int FUEL_SLOT = 1;
     static final int PRODUCT_SLOT = 2;
 
-    static final short ZERO_DURATION = 0;
-    static final short BURN_DURATION = 25 * Utils.MINS;   // This must be less than max short.
+    private static final int INVALID_TASK = -1;
+    
+    // These durations must all be less than max short.
+    // Additionally, TASK_DURATION + AVOID_STAMPEDE < BURN_DURATION.
+    private static final short ZERO_DURATION  =  0;
+    private static final short AVOID_STAMPEDE =  2 * Utils.MINS;
+    private static final short TASK_DURATION  = 20 * Utils.MINS;  
+    private static final short BURN_DURATION  = 25 * Utils.MINS;
 
-    static HashSet<Forge> active = new HashSet<Forge>();
+
+    static HashMap<Location, Forge> active = new HashMap<Location, Forge>();
+    private static java.util.Random rnd = new java.util.Random();
 
 
-    private Block block;
+    private static short initialTaskDelay() {
+        return (short) rnd.nextInt(AVOID_STAMPEDE);
+    }
+
+
+    private Location loc;
+    private int task = INVALID_TASK;
     
 
     public Forge(Block block) {
-        this.block = block;
+        this.loc = block.getLocation();
     }
 
     public Forge(Location loc) {
-        this.block = loc.getBlock();
+        this.loc = loc;
     }
 
     @Override
     public boolean equals(Object obj) {
-        return block.equals(((Forge) obj).block);
+        return loc.equals( ((Forge) obj).loc );
     }
 
     @Override
     public int hashCode() {
-        return block.hashCode();
+        return loc.hashCode();
     }
 
     Location getLocation() {
-        return block.getLocation();
+        return loc;
+    }
+
+    Block getBlock() {
+        return loc.getBlock();
     }
 
     boolean isValid() {
-        return Forge.isValid(block);
+        return Forge.isValid(getBlock());
     }
 
     static boolean isValid(Block block) {
-        return isValid(block, 1);
+        return isValid(block, DFConfig.maxStackVertical());
     }
 
     // This static version is kept around so that other code may check if a block
@@ -94,58 +112,275 @@ class Forge {
             return false;
 
         // Can't be a Forge beyond the vertical stacking limit.
-        int limit = DFConfig.maxStackVertical();
-        if (0 < limit && limit < stack)
+        if (stack <= 0)
             return false;
 
-        Block below = block.getRelative(BlockFace.DOWN);
-
         // Is lava or another Forge below? Then it is a Forge.
+        Block below = block.getRelative(BlockFace.DOWN);
         return Utils.isBlockOfType(below, Material.LAVA, Material.STATIONARY_LAVA)
-            || isValid(below, stack+1);
+            || isValid(below, stack - 1);
     }
 
     boolean isBurning() {
-        return Utils.isBlockOfType(block, Material.BURNING_FURNACE);
-    }
-
-    boolean isActive() {
-        return active.contains(this);
+        Furnace state = (Furnace) getBlock().getState();
+        return state.getBurnTime() > 0;
     }
 
     private void internalsSetFurnaceBurning(boolean flag) {
-        // This gets into Craftbukkit/Minecraft internalss, but it's simple and works.
+        // This gets into Craftbukkit internals, but it's simple and works.
         // See net.minecraft.server.BlockFurnace.java:69-84 (approx).
-        Location loc = block.getLocation();
         CraftWorld world = (CraftWorld) loc.getWorld();
-        BlockFurnace.a(flag, world.getHandle(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        BlockFurnace.a(flag, world.getHandle(),
+                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
     }
 
-    // Returns TRUE if the furnace is lit.
-    boolean ignite() {
-        boolean lit = false;
-        if (DFConfig.requireFuel()) {
-            lit = loadFuel();
-        }
-        else {
-            Furnace state = (Furnace) block.getState();
-            state.setBurnTime(BURN_DURATION);
-            state.update();
-            internalsSetFurnaceBurning(true);
-            lit = true;
-        }
-
-        // Anytime we (re-)ignite the furnace, we can attempt to reload
-        // raw materials.
-        loadRawMaterial();
-        return lit;
+    private void ignite() {
+        Furnace state = (Furnace) getBlock().getState();
+        state.setBurnTime(BURN_DURATION);
+        state.update();
+        internalsSetFurnaceBurning(true);
     }
-        
+
     void douse() {
-        Furnace state = (Furnace) block.getState();
+        Furnace state = (Furnace) getBlock().getState();
         state.setBurnTime(ZERO_DURATION);
         state.update();
         internalsSetFurnaceBurning(false);
+    }
+
+
+    // Returns false if forge should be deactivated.
+    boolean updateProduct() {
+        /*
+            product?
+                yes:
+                    unload product (*special: if product is coal, unload to input)
+        */
+        Furnace state = (Furnace) getBlock().getState();
+        Inventory blockInv = state.getInventory();
+
+        ItemStack item = blockInv.getItem(PRODUCT_SLOT);
+        if (item != null && item.getType() != Material.AIR) {
+            blockInv.clear(PRODUCT_SLOT);
+
+            // Item destination: default is output chest.
+            Block dest = getOutputChest();
+            
+            // Special case: if charcoal is product and fuel is required,
+            // put it back into input chest.
+            if (DFConfig.requireFuel() && item.getType() == Material.COAL) {
+                dest = getInputChest();
+            }
+
+            ItemStack remains = addTo(item, dest, false);
+            if (remains != null) {
+                // Put what remains back into product slot.
+                blockInv.setItem(PRODUCT_SLOT, remains);
+
+                // See if the raw slot is full. If so, make sure it
+                // is compatible with what remains. If not, shut it
+                // down.
+                ItemStack raw = blockInv.getItem(RAW_SLOT);
+                if (raw != null && raw.getType() != Material.AIR) {
+                    if (Utils.resultOfCooking(raw.getType()) != remains.getType()) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Returns false if forge should be deactivated.
+    boolean updateRawMaterial() {
+        /*
+            raw?
+                no:
+                    raw available?
+                        yes:
+                            load raw
+                            set cook time
+                        no:
+                            - shut down -
+        */
+        Furnace state = (Furnace) getBlock().getState();
+        Inventory blockInv = state.getInventory();
+
+        // Can only reload if the raw material slot is empty.
+        ItemStack raw = blockInv.getItem(RAW_SLOT);
+        if (raw == null || raw.getType() == Material.AIR) {
+
+            // Can only reload if an input chest is available.
+            Block input = getInputChest();
+            if (input != null) {
+
+                BetterChest chest = new BetterChest( (Chest) input.getState() );
+                Inventory chestInv = chest.getInventory();
+
+                boolean itemFound = false;
+
+                // Find the first smeltable item in the chest.
+                ItemStack[] allItems = chestInv.getContents();
+                for (ItemStack items : allItems) {
+                    if (items != null && Utils.canCook(items.getType())) {
+
+                        // TODO This probably needs to be elsewhere (and here?)
+                        // updateRawMaterial is ALWAYS called after updateProduct
+                        // If product remains and is NOT the same as what the
+                        // current item will cook to, skip it.
+                        ItemStack prod = blockInv.getItem(PRODUCT_SLOT);
+                        if (prod != null && prod.getType() != Material.AIR) {
+                            if (Utils.resultOfCooking(items.getType())
+                                    != prod.getType()) {
+                                continue;
+                            }
+                        }
+                        
+                        // TODO one at a time?
+                        chestInv.clear(chestInv.first(items));
+                        blockInv.setItem(RAW_SLOT, items);
+
+                        // setCookTime sets time elapsed, not time remaining.
+                        short dt = (short) (Math.max(
+                                DFConfig.cookTime(), 0) * Utils.SECS);
+                        setCookTime(dt);
+                        
+                        itemFound = true;
+                        break;
+                    }
+                }
+
+                if (!itemFound) {
+                    return false;
+                }
+            }
+            else {
+                // no input chest; no input material
+                return false;
+            }
+        }
+        else {
+            // Something already in the raw slot; is it smeltable?
+            return Utils.canCook(raw.getType());
+        }
+
+
+        return true;
+    }
+
+    // Returns false if forge should be deactivated.
+    boolean updateFuel() {
+        /*
+            fuel required?
+                no:
+                    extend fuel time
+                yes:
+                    fuel available?
+                        yes:
+                            load fuel
+                        no:
+                            - shut down -
+         */
+        if (!DFConfig.requireFuel()) {
+            // Fuel not required.
+            ignite();
+        }
+        else {
+            // Fuel required.
+            Furnace state = (Furnace) getBlock().getState();
+            Inventory blockInv = state.getInventory();
+
+            // Can reload only if fuel slot is empty.
+            ItemStack fuel = blockInv.getItem(FUEL_SLOT);
+            if (fuel == null || fuel.getType() == Material.AIR) {
+
+                // Can reload only if an input chest is available.
+                Block input = getInputChest();
+                if (input != null) {
+
+                    BetterChest chest = new BetterChest( (Chest) input.getState() );
+                    Inventory chestInv = chest.getInventory();
+
+                    boolean itemFound = false;
+
+                    // Find the first burnable item in the chest.
+                    ItemStack[] allItems = chestInv.getContents();
+                    for (ItemStack items : allItems) {
+                        if (items != null && Utils.canBurn(items.getType())) {
+                            // TODO one at a time?
+                            chestInv.clear(chestInv.first(items));
+                            blockInv.setItem(FUEL_SLOT, items);
+
+                            itemFound = true;
+                            break;
+                        }
+                    }
+
+                    if (!itemFound) {
+                        // TODO this might not be right... we want to allow
+                        // fuel to burn itself out...?
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    void update() {
+        if (isValid() && updateProduct() && updateRawMaterial() && updateFuel()) {
+            // Forge is ready to work!
+            activate();
+        }
+        else {
+            // Shut down the forge; missing something (e.g. fuel, raws...)
+            deactivate();
+            douse();
+        }
+    }
+
+    public void run() {
+        update();
+    }
+
+    void activate() {
+        // Only activate if not already active.
+        if (!isActive()) {
+
+            // Add to active forge map.
+            active.put(loc, this);
+
+            // Start repeating task.
+            task = DwarfForge.main.queueRepeatingTask(
+                    0, initialTaskDelay() + TASK_DURATION, this);
+
+            // TODO force save
+        }
+    }
+
+    void deactivate() {
+        // Only deactivate if currently active.
+        if (isActive()) {
+            
+            // Remove from active forge map.
+            active.remove(loc);
+
+            // Cancel repeating task.
+            if (task != INVALID_TASK) {
+                DwarfForge.main.cancelTask(task);
+                task = INVALID_TASK;
+            }
+
+            // TODO force save
+        }
+
+        // TODO Sanity check: assert(task == INVALID_TASK)
+    }
+
+    boolean isActive() {
+        return active.containsKey(loc);
     }
 
     void toggle() {
@@ -153,18 +388,12 @@ class Forge {
             if (DFConfig.requireFuel()) {
                 unloadFuel();
             }
-            else {
-                douse();
-            }
-            active.remove(this);
+            deactivate();
+            douse();
         }
         else {
-            if (ignite()) {
-                active.add(this);
-            }
+            update();
         }
-            
-        DwarfForge.saveActiveForges(active);
     }
 
     private static BlockFace getForward(Block block) {
@@ -173,13 +402,12 @@ class Forge {
     }
 
     private static Block getForgeChest(Block block, BlockFace dir) {
-        return getForgeChest(block, dir, 1);
+        return getForgeChest(block, dir, DFConfig.maxStackHorizontal());
     }
 
     private static Block getForgeChest(Block block, BlockFace dir, int stack) {
         // Can't use the chest beyond horizontal stacking limit.
-        int limit = DFConfig.maxStackHorizontal();
-        if (0 < limit && limit < stack)
+        if (stack <= 0)
             return null;
 
         // If the adjacent block is a chest, use it.
@@ -190,12 +418,12 @@ class Forge {
         // If there is a forge below, use its chest.
         Block below = block.getRelative(BlockFace.DOWN);
         if (Forge.isValid(below))
-            return getForgeChest(below, dir, stack);    // Don't increase stack limit going down.
+            return getForgeChest(below, dir, stack);    // Don't change horz stack dist going down.
 
         // If there is a forge adjacent (in provided direction) and it
         // has a chest, use it.
         if (Forge.isValid(adjacent))
-            return getForgeChest(adjacent, dir, stack+1);
+            return getForgeChest(adjacent, dir, stack-1);
 
         // No chest.
         return null;
@@ -203,82 +431,19 @@ class Forge {
 
     Block getInputChest() {
         // Look for a chest stage-right (i.e. "next" cardinal face);
+        Block block = getBlock();
         return getForgeChest(block, Utils.nextCardinalFace(getForward(block)));
     }
 
     Block getOutputChest() {
         // Look for a chest stage-left (i.e. "prev" cardinal face).
+        Block block = getBlock();
         return getForgeChest(block, Utils.prevCardinalFace(getForward(block)));
-    }
-
-    void loadRawMaterial() {
-        Furnace state = (Furnace) block.getState();
-        Inventory blockInv = state.getInventory();
-
-        // If the raw material slot in the furnace is occupied, can't reload.
-        ItemStack raw = blockInv.getItem(RAW_SLOT);
-        if (raw != null && raw.getType() != Material.AIR)
-            return;
-
-        // If there is no input chest, can't reload.
-        Block input = getInputChest();
-        if (input == null)
-            return;
-
-        BetterChest chest = new BetterChest( (Chest) input.getState() );
-        Inventory chestInv = chest.getInventory();
-
-        // Find the first smeltable item in the chest.
-        ItemStack[] allItems = chestInv.getContents();
-        for (ItemStack items : allItems) {
-            if (items == null)
-                continue;
-
-            if (Utils.canCook(items.getType())) {
-                chestInv.clear(chestInv.first(items));  // Remove from the chest.
-                blockInv.setItem(RAW_SLOT, items);      // Add to the furnace.
-                return;
-            }
-        }
-    }
-
-    // Returns true if fuel is in the fuel slot (not necessarily if it was just loaded).
-    boolean loadFuel() {
-        Furnace state = (Furnace) block.getState();
-        Inventory blockInv = state.getInventory();
-
-        // If the fuel slot in the furnace is occupied, can't reload.
-        ItemStack fuel = blockInv.getItem(FUEL_SLOT);
-        if (fuel != null && fuel.getType() != Material.AIR)
-            return true;    // We didn't load, but there IS fuel there.
-
-        // If there is no input chest, can't reload.
-        Block input = getInputChest();
-        if (input == null)
-            return false;
-
-        BetterChest chest = new BetterChest( (Chest) input.getState() );
-        Inventory chestInv = chest.getInventory();
-
-        // Find the first burnable item in the chest.
-        ItemStack[] allItems = chestInv.getContents();
-        for (ItemStack items : allItems) {
-            if (items == null)
-                continue;
-
-            if (Utils.canBurn(items.getType())) {
-                chestInv.clear(chestInv.first(items));  // Remove from the chest.
-                blockInv.setItem(FUEL_SLOT, items);     // Add to the furnace.
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // This may get called if fuel is required and the operator toggles the forge off.
     void unloadFuel() {
-        Furnace state = (Furnace) block.getState();
+        Furnace state = (Furnace) getBlock().getState();
         Inventory blockInv = state.getInventory();
 
         // Remove fuel from the furnace.
@@ -301,18 +466,18 @@ class Forge {
 
         // Second, drop on ground.
         if (fuel != null)
-            block.getWorld().dropItemNaturally(block.getLocation(), fuel);
+            loc.getWorld().dropItemNaturally(loc, fuel);
     }
 
     // Move the item stack to the input/output chest as provided, either returning
     // what remains or dropping it based on flag. Note: chest might be null.
     ItemStack addTo(ItemStack item, Block chest, boolean dropRemains) {
-        if (item == null)   // This should NOT be the case, but haven't verified just yet.
+        if (item == null)   // TODO This should NOT be possible: need to verify.
             return null;
 
         if (chest == null) {    // No destination chest.
             if (dropRemains) {
-                block.getWorld().dropItemNaturally(block.getLocation(), item);
+                loc.getWorld().dropItemNaturally(loc, item);
                 return null;
             }
             else {
@@ -331,7 +496,7 @@ class Forge {
             else {
                 // Destination chest full.
                 if (dropRemains) {
-                    block.getWorld().dropItemNaturally(block.getLocation(), remains.get(0));
+                    loc.getWorld().dropItemNaturally(loc, remains.get(0));
                     return null;
                 }
                 else {
@@ -345,72 +510,27 @@ class Forge {
         return addTo(item, getOutputChest(), dropRemains);
     }
 
-    void unloadProduct() {
-        Furnace state = (Furnace) block.getState();
-        Inventory blockInv = state.getInventory();
-
-        ItemStack item = blockInv.getItem(PRODUCT_SLOT);
-        if (item != null) {
-            blockInv.clear(PRODUCT_SLOT);
-
-            // Special test: if charcoal is product and fuel is required, put it back into input chest.
-            Block dest;
-            if (DFConfig.requireFuel() && item.getType() == Material.COAL) {
-                dest = getInputChest();
-            }
-            else {
-                dest = getOutputChest();    // all other products go to output chest
-            }
-
-            ItemStack remains = addTo(item, dest, false);
-            
-            if (remains != null) {
-                // Put what remains back into product slot.
-                blockInv.setItem(PRODUCT_SLOT, remains);
-            }
-        }
-    }
-
     void setCookTime(short dt) {
-        ((Furnace) block.getState()).setCookTime(dt);
+        ((Furnace) getBlock().getState()).setCookTime(dt);
     }
 
-    static void updateAll() {
-        boolean forceSave = false;
+    static Forge find(Block block) {
+        return find(block.getLocation());
+    }
 
-        Iterator<Forge> it = active.iterator();
-        while (it.hasNext()) {
-            Forge forge = it.next();
-
-            // It's possible for blocks to change such that they are no longer
-            // considered forges. (TODO: How???) Forget the remembered forge.
-
-            if (!forge.isValid()) {
-                it.remove();
-                forceSave = true;
-
-                // TODO: What's the "right thing" to do if it's still a burning furnace?
-                // Don't douse it if fuel is required; it should burn out on its own.
-                if (!DFConfig.requireFuel() && forge.isBurning()) {
-                    forge.douse();
-                }
-            }
-            else if (DFConfig.requireFuel()) {
-                // Remove from active list if no longer burning (ie., ran out of fuel).
-                if (!forge.isBurning()) {
-                    it.remove();
-                    forceSave = true;
-                }
-            }
-            else {
-                // Still a forge, without need for fuel; keep it burning.
-                forge.ignite();
-            }
+    static Forge find(Location loc) {
+        // Is it in the active Forges?
+        if (active.containsKey(loc)) {
+            return active.get(loc);
         }
 
-        if (forceSave) {
-            DwarfForge.saveActiveForges(active);
+        // Does the location block represent a valid Forge? If so, return a new one.
+        if (isValid(loc.getBlock())) {
+            return new Forge(loc);
         }
+
+        // Otherwise, null.
+        return null;
     }
 
 }
