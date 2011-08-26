@@ -82,9 +82,8 @@ class Utils {
     }
 
     static boolean canBurn(Material m) {
-        return isTypicalFuel(m)
-        //  || isCraftedFuel(m)     // TODO allowCraftedFuel
-            ;
+        return  isTypicalFuel(m)
+            || (isCraftedFuel(m) && DFConfig.allowCraftedFuel());
     }
 
     static BlockFace nextCardinalFace(BlockFace dir) {
