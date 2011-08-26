@@ -59,7 +59,6 @@ public class DoubleInventory implements Inventory {
     }
 
     public HashMap<Integer, ItemStack> addItem(ItemStack... items) {
-        // TODO: Reasonable implementation?
         HashMap<Integer, ItemStack> leftover = major.addItem(items);
         if (leftover != null && !leftover.isEmpty()) {
             ItemStack[] rest = { }; // not null
@@ -70,7 +69,6 @@ public class DoubleInventory implements Inventory {
     }
 
     public HashMap<Integer, ItemStack> removeItem(ItemStack... items) {
-        // TODO: Reasonable implementation?
         HashMap<Integer, ItemStack> leftover = major.addItem(items);
         if (leftover != null && !leftover.isEmpty()) {
             ItemStack[] rest = { }; // not null
@@ -85,7 +83,6 @@ public class DoubleInventory implements Inventory {
     }
 
     public void setContents(ItemStack[] items) {
-        // TODO: Reasonable implementation?
         int majorSize = major.getSize();
         if (items.length <= majorSize) {
             major.setContents(items);
@@ -223,7 +220,6 @@ public class DoubleInventory implements Inventory {
     private static <T> HashMap<Integer, ? extends T> combineWithOffset(HashMap<Integer, ? extends T> first,
                                                                        HashMap<Integer, ? extends T> second,
                                                                        int offset) {
-        // TODO: Reasonable implementation?
         HashMap<Integer, T> result = new HashMap<Integer, T>(first);
 
         // Put in items from the second map, adjusting key values.
