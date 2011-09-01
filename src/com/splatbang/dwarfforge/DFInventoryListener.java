@@ -110,7 +110,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         // Reload fuel if required.
         if (DFConfig.requireFuel()) {
             main.queueTask(new Runnable() {
-                public void run() { forge.update(); }
+                public void run() { forge.burnUpdate(); }
             });
         }
     }
@@ -129,7 +129,7 @@ class DFInventoryListener extends InventoryListener implements DwarfForge.Listen
         // Queue up task to unload and reload the furnace.
         final Forge forge = Forge.find(block);
         main.queueTask(new Runnable() {
-            public void run() { forge.update(); }
+            public void run() { forge.smeltUpdate(); }
         });
     }
 }

@@ -48,12 +48,12 @@ class Forge implements Runnable {
     static final int PRODUCT_SLOT = 2;
 
     private static final int INVALID_TASK = -1;
-    
+
     // These durations must all be less than max short.
     // Additionally, TASK_DURATION + AVOID_STAMPEDE < BURN_DURATION.
     private static final short ZERO_DURATION  =  0;
     private static final short AVOID_STAMPEDE =  2 * Utils.MINS;
-    private static final short TASK_DURATION  = 20 * Utils.MINS;  
+    private static final short TASK_DURATION  = 20 * Utils.MINS;
     private static final short BURN_DURATION  = 25 * Utils.MINS;
 
 
@@ -61,14 +61,14 @@ class Forge implements Runnable {
     private static java.util.Random rnd = new java.util.Random();
 
 
-    private static short initialTaskDelay() {
+    private static short avoidStampedeDelay() {
         return (short) rnd.nextInt(AVOID_STAMPEDE);
     }
 
 
     private Location loc;
     private int task = INVALID_TASK;
-    
+
 
     public Forge(Block block) {
         this.loc = block.getLocation();
@@ -141,7 +141,7 @@ class Forge implements Runnable {
         internalsSetFurnaceBurning(true);
     }
 
-    void douse() {
+    private void douse() {
         Furnace state = (Furnace) getBlock().getState();
         state.setBurnTime(ZERO_DURATION);
         state.update();
@@ -165,7 +165,7 @@ class Forge implements Runnable {
 
             // Item destination: default is output chest.
             Block dest = getOutputChest();
-            
+
             // Special case: if charcoal is product and fuel is required,
             // put it back into input chest.
             if (DFConfig.requireFuel() && item.getType() == Material.COAL) {
@@ -236,16 +236,13 @@ class Forge implements Runnable {
                                 continue;
                             }
                         }
-                        
+
                         // TODO one at a time?
                         chestInv.clear(chestInv.first(items));
                         blockInv.setItem(RAW_SLOT, items);
 
-                        // setCookTime sets time elapsed, not time remaining.
-                        short dt = (short) (Math.max(
-                                DFConfig.cookTime(), 0) * Utils.SECS);
-                        setCookTime(dt);
-                        
+                        ((Furnace) getBlock().getState()).setCookTime(DFConfig.cookTime());
+
                         itemFound = true;
                         break;
                     }
@@ -272,56 +269,48 @@ class Forge implements Runnable {
     // Returns false if forge should be deactivated.
     boolean updateFuel() {
         /*
-            fuel required?
-                no:
-                    extend fuel time
-                yes:
-                    fuel available?
-                        yes:
-                            load fuel
-                        no:
-                            - shut down -
+          fuel available?
+              yes:
+                  load fuel
+              no:
+                  - shut down -
          */
-        if (!DFConfig.requireFuel()) {
-            // Fuel not required.
-            ignite();
-        }
-        else {
-            // Fuel required.
-            Furnace state = (Furnace) getBlock().getState();
-            Inventory blockInv = state.getInventory();
 
-            // Can reload only if fuel slot is empty.
-            ItemStack fuel = blockInv.getItem(FUEL_SLOT);
-            if (fuel == null || fuel.getType() == Material.AIR) {
+        // TODO assert DFConfig.requireFuel()
 
-                // Can reload only if an input chest is available.
-                Block input = getInputChest();
-                if (input != null) {
+        Furnace state = (Furnace) getBlock().getState();
+        Inventory blockInv = state.getInventory();
 
-                    BetterChest chest = new BetterChest( (Chest) input.getState() );
-                    Inventory chestInv = chest.getInventory();
+        // Can reload only if fuel slot is empty.
+        ItemStack fuel = blockInv.getItem(FUEL_SLOT);
+        if (fuel == null || fuel.getType() == Material.AIR) {
 
-                    boolean itemFound = false;
+            // Can reload only if an input chest is available.
+            Block input = getInputChest();
+            if (input != null) {
 
-                    // Find the first burnable item in the chest.
-                    ItemStack[] allItems = chestInv.getContents();
-                    for (ItemStack items : allItems) {
-                        if (items != null && Utils.canBurn(items.getType())) {
-                            // TODO one at a time?
-                            chestInv.clear(chestInv.first(items));
-                            blockInv.setItem(FUEL_SLOT, items);
+                BetterChest chest = new BetterChest( (Chest) input.getState() );
+                Inventory chestInv = chest.getInventory();
 
-                            itemFound = true;
-                            break;
-                        }
+                boolean itemFound = false;
+
+                // Find the first burnable item in the chest.
+                ItemStack[] allItems = chestInv.getContents();
+                for (ItemStack items : allItems) {
+                    if (items != null && Utils.canBurn(items.getType())) {
+                        // TODO one at a time?
+                        chestInv.clear(chestInv.first(items));
+                        blockInv.setItem(FUEL_SLOT, items);
+
+                        itemFound = true;
+                        break;
                     }
+                }
 
-                    if (!itemFound) {
-                        // TODO this might not be right... we want to allow
-                        // fuel to burn itself out...?
-                        return false;
-                    }
+                if (!itemFound) {
+                    // TODO this might not be right... we want to allow
+                    // fuel to burn itself out...?
+                    return false;
                 }
             }
         }
@@ -330,22 +319,55 @@ class Forge implements Runnable {
     }
 
     void update() {
-        if (isValid() && updateProduct() && updateRawMaterial() && updateFuel()) {
-            // Forge is ready to work!
-            activate();
+        // TODO assert that the forge is active; when would we ever update an
+        // inactive forge?
+
+        if (isValid()) {
+            if (DFConfig.requireFuel()) {
+
+                if (!updateProduct() || !updateRawMaterial() || !updateFuel()) {
+                    // Something is preventing further smelting. Unload fuel,
+                    // deactivate, and let it burn out naturally.
+                    // TODO This may not be the best option...? Try it for now.
+                    deactivate();
+                    unloadFuel();
+                }
+            }
+            else {
+              // No fuel required; only user interaction changes forge state.
+              // No user interaction here; run the processes, but don't change
+              // active state.
+              updateProduct();
+              updateRawMaterial();
+              ignite();
+            }
         }
         else {
-            // Shut down the forge; missing something (e.g. fuel, raws...)
-            deactivate();
+          // No longer valid: deactivate.
+          deactivate();
+
+          // Douse only if fuel is not required.
+          if (!DFConfig.requireFuel()) {
             douse();
+          }
+
         }
     }
 
-    public void run() {
+    void burnUpdate() { update(); }
+
+    void smeltUpdate() {
+        // After a normal update (caused by an item-smelted event), set
+        // the new cook time.
         update();
+        if (isActive()) {
+          ((Furnace) getBlock().getState()).setCookTime(DFConfig.cookTime());
+        }
     }
 
-    void activate() {
+    public void run() { update(); }
+
+    private void activate() {
         // Only activate if not already active.
         if (!isActive()) {
 
@@ -354,16 +376,16 @@ class Forge implements Runnable {
 
             // Start repeating task.
             task = DwarfForge.main.queueRepeatingTask(
-                    0, initialTaskDelay() + TASK_DURATION, this);
+                    0, TASK_DURATION + avoidStampedeDelay(), this);
 
             // TODO force save
         }
     }
 
-    void deactivate() {
+    private void deactivate() {
         // Only deactivate if currently active.
         if (isActive()) {
-            
+
             // Remove from active forge map.
             active.remove(loc);
 
@@ -383,16 +405,19 @@ class Forge implements Runnable {
         return active.containsKey(loc);
     }
 
+    // Manual, user interaction to startup/shutdown a forge.
     void toggle() {
         if (isActive()) {
             if (DFConfig.requireFuel()) {
                 unloadFuel();
+                // TODO Save partial fuel.
             }
             deactivate();
             douse();
         }
         else {
-            update();
+            activate();
+            ((Furnace) getBlock().getState()).setCookTime(DFConfig.cookTime());
         }
     }
 
@@ -508,10 +533,6 @@ class Forge implements Runnable {
 
     ItemStack addToOutput(ItemStack item, boolean dropRemains) {
         return addTo(item, getOutputChest(), dropRemains);
-    }
-
-    void setCookTime(short dt) {
-        ((Furnace) getBlock().getState()).setCookTime(dt);
     }
 
     static Forge find(Block block) {

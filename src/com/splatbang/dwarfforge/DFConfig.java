@@ -69,6 +69,18 @@ class DFConfig {
         requireFuel = config.getBoolean(KEY_REQUIRE_FUEL, DEFAULT_REQUIRE_FUEL);
         cookTime = config.getDouble(KEY_COOK_TIME, DEFAULT_COOK_TIME);
 
+        // Some limits...
+        if (maxStackVertical < 0)
+          maxStackVertical = 0;
+        if (maxStackHorizontal < 0)
+          maxStackHorizontal = 0;
+
+        if (cookTime < 0)
+          cookTime = 0;
+        if (cookTime > DEFAULT_COOK_TIME)
+          cookTime = DEFAULT_COOK_TIME;
+
+
         // If the config file didn't exist, this will write a default back to disk.
         config.save();
     }
@@ -77,9 +89,10 @@ class DFConfig {
         config = null;
     }
 
-    static double cookTime() {
-        // As a parameter to setCookTime, we want to set time elapsed: NOT time remaining.
-        return DEFAULT_COOK_TIME - cookTime;    
+    static short cookTime() {
+        // Furnace.setCookTime sets time elapsed, NOT time remaining.
+        // The config file specifies time remaining, so adjust here.
+        return (short) (Utils.SECS * (DEFAULT_COOK_TIME - cookTime));
     }
 
     static boolean allowCraftedFuel() {
