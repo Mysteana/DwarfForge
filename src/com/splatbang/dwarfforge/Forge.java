@@ -136,26 +136,21 @@ class Forge implements Runnable {
 
     private void ignite() {
         Furnace state = (Furnace) getBlock().getState();
+        internalsSetFurnaceBurning(true);
         state.setBurnTime(BURN_DURATION);
         state.update();
-        internalsSetFurnaceBurning(true);
     }
 
     private void douse() {
         Furnace state = (Furnace) getBlock().getState();
+        internalsSetFurnaceBurning(false);
         state.setBurnTime(ZERO_DURATION);
         state.update();
-        internalsSetFurnaceBurning(false);
     }
 
 
     // Returns false if forge should be deactivated.
     boolean updateProduct() {
-        /*
-            product?
-                yes:
-                    unload product (*special: if product is coal, unload to input)
-        */
         Furnace state = (Furnace) getBlock().getState();
         Inventory blockInv = state.getInventory();
 
@@ -194,16 +189,6 @@ class Forge implements Runnable {
 
     // Returns false if forge should be deactivated.
     boolean updateRawMaterial() {
-        /*
-            raw?
-                no:
-                    raw available?
-                        yes:
-                            load raw
-                            set cook time
-                        no:
-                            - shut down -
-        */
         Furnace state = (Furnace) getBlock().getState();
         Inventory blockInv = state.getInventory();
 
@@ -237,10 +222,20 @@ class Forge implements Runnable {
                             }
                         }
 
-                        // TODO one at a time?
-                        chestInv.clear(chestInv.first(items));
-                        blockInv.setItem(RAW_SLOT, items);
+                        // Move one item at a time, rather than one stack
+                        // for more parallelism.
+                        ItemStack single = items.clone();
+                        single.setAmount(1);
+                        blockInv.setItem(RAW_SLOT, single);
 
+                        if (items.getAmount() == 1) {
+                          chestInv.clear(chestInv.first(items));
+                        }
+                        else {
+                          items.setAmount(items.getAmount() - 1);
+                        }
+
+                        // Set cook time.
                         ((Furnace) getBlock().getState()).setCookTime(DFConfig.cookTime());
 
                         itemFound = true;
@@ -268,14 +263,6 @@ class Forge implements Runnable {
 
     // Returns false if forge should be deactivated.
     boolean updateFuel() {
-        /*
-          fuel available?
-              yes:
-                  load fuel
-              no:
-                  - shut down -
-         */
-
         // TODO assert DFConfig.requireFuel()
 
         Furnace state = (Furnace) getBlock().getState();
@@ -354,8 +341,10 @@ class Forge implements Runnable {
         }
     }
 
+    // Called on furnace fuel burn events.
     void burnUpdate() { update(); }
 
+    // Called on furnace material smelt events.
     void smeltUpdate() {
         // After a normal update (caused by an item-smelted event), set
         // the new cook time.
