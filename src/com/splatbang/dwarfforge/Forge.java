@@ -285,9 +285,19 @@ class Forge implements Runnable {
                 ItemStack[] allItems = chestInv.getContents();
                 for (ItemStack items : allItems) {
                     if (items != null && Utils.canBurn(items.getType())) {
-                        // TODO one at a time?
-                        chestInv.clear(chestInv.first(items));
-                        blockInv.setItem(FUEL_SLOT, items);
+
+                        // Move one item at a time, rather than one stack
+                        // for more parallelism.
+                        ItemStack single = items.clone();
+                        single.setAmount(1);
+                        blockInv.setItem(FUEL_SLOT, single);
+
+                        if (items.getAmount() == 1) {
+                            chestInv.clear(chestInv.first(items));
+                        }
+                        else {
+                            items.setAmount(items.getAmount() - 1);
+                        }
 
                         itemFound = true;
                         break;
