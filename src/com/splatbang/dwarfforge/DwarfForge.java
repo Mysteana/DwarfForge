@@ -64,7 +64,10 @@ public class DwarfForge extends JavaPlugin {
     public void onEnable() {
         main = this;
 
-        DFConfig.onEnable(getConfiguration());
+        getConfig().options().copyDefaults(true);
+        saveConfig();
+
+        DFConfig.onEnable(getConfig());
 
         restoreActiveForges(Forge.active);
         permission.enable(this);

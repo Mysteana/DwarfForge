@@ -23,51 +23,43 @@
 package com.splatbang.dwarfforge;
 
 
-import org.bukkit.util.config.Configuration;
+import org.bukkit.configuration.file.FileConfiguration;
 
 
 class DFConfig {
-    private static Configuration config;
-
     private final static String KEY_COOK_TIME = "DwarfForge.cooking-time.default";
-    private final static double DEFAULT_COOK_TIME = 9.25;
+    private final static double MAX_COOK_TIME = 9.25;
     private static double cookTime;
 
     private final static String KEY_REQUIRE_FUEL = "DwarfForge.fuel.require";
-    private final static boolean DEFAULT_REQUIRE_FUEL = false;
     private static boolean requireFuel;
 
     private final static String KEY_ALLOW_CRAFTED_FUEL = "DwarfForge.fuel.allow-crafted-items";
-    private final static boolean DEFAULT_ALLOW_CRAFTED_FUEL = false;
     private static boolean allowCraftedFuel;
 
     private final static String KEY_MAX_STACK_HORIZONTAL = "DwarfForge.stack-limit.horizontal";
-    private final static int DEFAULT_MAX_STACK_HORIZONTAL = 4;
     private static int maxStackHorizontal;
 
     private final static String KEY_MAX_STACK_VERTICAL = "DwarfForge.stack-limit.vertical";
-    private final static int DEFAULT_MAX_STACK_VERTICAL = 3;
     private static int maxStackVertical;
 
     private final static String KEY_PERMISSIONS_ENABLE = "Permissions.if-available.enable";
-    private final static boolean DEFAULT_PERMISSIONS_ENABLE = false;
     private static boolean enablePermissions;
 
     private final static String KEY_NOPERMS_OPS_ONLY = "Permissions.if-disabled.ops-only";
-    private final static boolean DEFAULT_NOPERMS_OPS_ONLY = false;
     private static boolean opsOnly;
 
 
-    static void onEnable(Configuration cfg) {
-        config = cfg;
+    static void onEnable(FileConfiguration config) {
+        //config.options().copyDefaults();
 
-        opsOnly = config.getBoolean(KEY_NOPERMS_OPS_ONLY, DEFAULT_NOPERMS_OPS_ONLY);
-        enablePermissions = config.getBoolean(KEY_PERMISSIONS_ENABLE, DEFAULT_PERMISSIONS_ENABLE);
-        maxStackVertical = config.getInt(KEY_MAX_STACK_VERTICAL, DEFAULT_MAX_STACK_VERTICAL);
-        maxStackHorizontal = config.getInt(KEY_MAX_STACK_HORIZONTAL, DEFAULT_MAX_STACK_HORIZONTAL);
-        allowCraftedFuel = config.getBoolean(KEY_ALLOW_CRAFTED_FUEL, DEFAULT_ALLOW_CRAFTED_FUEL);
-        requireFuel = config.getBoolean(KEY_REQUIRE_FUEL, DEFAULT_REQUIRE_FUEL);
-        cookTime = config.getDouble(KEY_COOK_TIME, DEFAULT_COOK_TIME);
+        opsOnly = config.getBoolean(KEY_NOPERMS_OPS_ONLY);
+        enablePermissions = config.getBoolean(KEY_PERMISSIONS_ENABLE);
+        maxStackVertical = config.getInt(KEY_MAX_STACK_VERTICAL);
+        maxStackHorizontal = config.getInt(KEY_MAX_STACK_HORIZONTAL);
+        allowCraftedFuel = config.getBoolean(KEY_ALLOW_CRAFTED_FUEL);
+        requireFuel = config.getBoolean(KEY_REQUIRE_FUEL);
+        cookTime = config.getDouble(KEY_COOK_TIME);
 
         // Some limits...
         if (maxStackVertical < 0)
@@ -77,22 +69,17 @@ class DFConfig {
 
         if (cookTime < 0)
           cookTime = 0;
-        if (cookTime > DEFAULT_COOK_TIME)
-          cookTime = DEFAULT_COOK_TIME;
-
-
-        // If the config file didn't exist, this will write a default back to disk.
-        config.save();
+        if (cookTime > MAX_COOK_TIME)
+          cookTime = MAX_COOK_TIME;
     }
 
     static void onDisable() {
-        config = null;
     }
 
     static short cookTime() {
         // Furnace.setCookTime sets time elapsed, NOT time remaining.
         // The config file specifies time remaining, so adjust here.
-        return (short) (Utils.SECS * (DEFAULT_COOK_TIME - cookTime));
+        return (short) (Utils.SECS * (MAX_COOK_TIME - cookTime));
     }
 
     static boolean allowCraftedFuel() {
