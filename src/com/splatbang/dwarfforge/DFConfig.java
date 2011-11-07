@@ -43,18 +43,8 @@ class DFConfig {
     private final static String KEY_MAX_STACK_VERTICAL = "DwarfForge.stack-limit.vertical";
     private static int maxStackVertical;
 
-    private final static String KEY_PERMISSIONS_ENABLE = "Permissions.if-available.enable";
-    private static boolean enablePermissions;
-
-    private final static String KEY_NOPERMS_OPS_ONLY = "Permissions.if-disabled.ops-only";
-    private static boolean opsOnly;
-
 
     static void onEnable(FileConfiguration config) {
-        //config.options().copyDefaults();
-
-        opsOnly = config.getBoolean(KEY_NOPERMS_OPS_ONLY);
-        enablePermissions = config.getBoolean(KEY_PERMISSIONS_ENABLE);
         maxStackVertical = config.getInt(KEY_MAX_STACK_VERTICAL);
         maxStackHorizontal = config.getInt(KEY_MAX_STACK_HORIZONTAL);
         allowCraftedFuel = config.getBoolean(KEY_ALLOW_CRAFTED_FUEL);
@@ -96,14 +86,6 @@ class DFConfig {
 
     static int maxStackVertical() {
         return maxStackVertical;
-    }
-
-    static boolean enablePermissions() {
-        return enablePermissions;
-    }
-
-    static boolean opsOnly() {
-        return opsOnly;
     }
 }
 

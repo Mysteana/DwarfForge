@@ -76,7 +76,7 @@ class DFBlockListener extends BlockListener implements DwarfForge.Listener {
 
         // Does the player have permission?
         Player player = event.getPlayer();
-        if (!main.permission.allow(player, "dwarfforge.create")) {
+        if (!player.hasPermission("dwarfforge.create")) {
             // No: cancel the event.
             event.setCancelled(true);
             player.sendMessage("Ye have not the strength of the Dwarfs to create such a forge.");
@@ -96,7 +96,7 @@ class DFBlockListener extends BlockListener implements DwarfForge.Listener {
 
         // Does the player have permission?
         Player player = event.getPlayer();
-        if (!main.permission.allow(player, "dwarfforge.destroy")) {
+        if (!player.hasPermission("dwarfforge.destroy")) {
             // NO: cancel the event.
             event.setCancelled(true);
             player.sendMessage("Ye have not the might of the Dwarfs to destroy such a forge.");
@@ -117,7 +117,7 @@ class DFBlockListener extends BlockListener implements DwarfForge.Listener {
         // Do nothing if the player hasn't permission to use the forge.
         // Note that we do NOT cancel the event; only this plugin does no further work.
         Player player = event.getPlayer();
-        if (!main.permission.allow(player, "dwarfforge.use")) {
+        if (!player.hasPermission("dwarfforge.use")) {
             player.sendMessage("Ye have not the will of the Dwarfs to use such a forge.");
             return;
         }

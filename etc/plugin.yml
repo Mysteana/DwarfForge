@@ -1,6 +1,23 @@
 name: DwarfForge
 main: com.splatbang.dwarfforge.DwarfForge
-version: 1.7
+version: 1.7.1
 
 commands:
+
+permissions:
+    dwarfforge.*:
+        description: Gives access to all DwarfForge commands.
+        children:
+            dwarfforge.create: true
+            dwarfforge.use: true
+            dwarfforge.destroy: true
+    dwarfforge.create:
+        decription: Allows you to create a Dwarven forge.
+        default: true
+    dwarfforge.use:
+        decription: Allows you to use a Dwarven forge.
+        default: true
+    dwarfforge.destroy:
+        decription: Allows you to destroy a Dwarven forge.
+        default: true
 

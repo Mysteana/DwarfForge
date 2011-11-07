@@ -46,8 +46,6 @@ public class DwarfForge extends JavaPlugin {
 
     static Logger log = Logger.getLogger("Minecraft");
 
-    DFPermissions permission = new DFPermissions();
-
     interface Listener {
         void onEnable(DwarfForge main);
         void onDisable();
@@ -70,7 +68,6 @@ public class DwarfForge extends JavaPlugin {
         DFConfig.onEnable(getConfig());
 
         restoreActiveForges(Forge.active);
-        permission.enable(this);
         for (Listener listener : listeners) {
             listener.onEnable(this);
         }
@@ -84,7 +81,6 @@ public class DwarfForge extends JavaPlugin {
         for (Listener listener : listeners) {
             listener.onDisable();
         }
-        permission.disable();
         saveActiveForges(Forge.active);
 
         DFConfig.onDisable();
