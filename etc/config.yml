@@ -1,0 +1,9 @@
+DwarfForge:
+    cooking-time:
+        default: 9.25
+    fuel:
+        require: false
+        allow-crafted-items: true
+    stack-limit:
+        horizontal: 4
+        vertical: 3
